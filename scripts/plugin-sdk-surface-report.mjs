@@ -105,7 +105,8 @@ const defaultPublicDeprecatedExportsByEntrypointBudget = Object.freeze({
   "inbound-reply-dispatch": 24,
   "channel-reply-pipeline": 12,
   "interactive-runtime": 11,
-  "infra-runtime": 593,
+  // +3: deprecated DEFAULT_AGENT_ID alias re-exported through infra runtime surfaces.
+  "infra-runtime": 596,
   "ssrf-policy": 1,
   "ssrf-runtime": 1,
   "media-runtime": 2,
@@ -175,7 +176,8 @@ export function readPluginSdkSurfaceBudgets(env = process.env) {
     ),
     publicDeprecatedExports: readPluginSdkSurfaceBudgetEnv(
       "OPENCLAW_PLUGIN_SDK_MAX_PUBLIC_DEPRECATED_EXPORTS",
-      1683,
+      // +3: deprecated DEFAULT_AGENT_ID alias across public infra runtime entrypoints.
+      1686,
       env,
     ),
     publicWildcardReexports: readPluginSdkSurfaceBudgetEnv(
