@@ -154,7 +154,8 @@ export function readPluginSdkSurfaceBudgets(env = process.env) {
       // +1: agent-harness transcript visibility projector.
       // +1: outbound formatting capability profile.
       // +3: plugin approval reviewer-detail cap/truncator and sanitize-with-status variant.
-      4694,
+      // +1: typed owner-required error for session store path resolution.
+      4695,
       env,
     ),
     publicFunctionExports: readPluginSdkSurfaceBudgetEnv(
