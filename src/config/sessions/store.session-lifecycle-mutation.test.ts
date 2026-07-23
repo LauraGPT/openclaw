@@ -24,6 +24,7 @@ import {
   replaceSessionEntry,
   resetSessionEntryLifecycle,
 } from "./session-accessor.js";
+import { planSqliteSessionLifecycleArtifactCleanup } from "./session-accessor.sqlite-lifecycle-state.js";
 import { replaceSqliteTranscriptEvents } from "./session-accessor.sqlite.js";
 import { resolveSqliteTargetFromSessionStorePath } from "./session-sqlite-target.js";
 import { searchSessionTranscripts } from "./session-transcript-search.js";
@@ -578,6 +579,21 @@ describe("session store lifecycle mutations", () => {
         storePath,
       }),
     ).resolves.toEqual([createTranscriptEvent("entry-only-session", "preserve transcript rows")]);
+    const database = openLifecycleTestDatabase(storePath);
+    expect(
+      database.db
+        .prepare(
+          `SELECT sn.current_session_id, sn.entry_json, sw.session_id
+           FROM session_nodes AS sn
+           JOIN session_windows AS sw ON sw.session_key = sn.session_key
+           WHERE sn.session_key = ?`,
+        )
+        .get("agent:main:delete-entry-only"),
+    ).toEqual({
+      current_session_id: "entry-only-session",
+      entry_json: "{}",
+      session_id: "entry-only-session",
+    });
   });
 
   it("deletes SQLite transcript rows for non-archived lifecycle removals", async () => {
@@ -623,6 +639,60 @@ describe("session store lifecycle mutations", () => {
         storePath,
       }),
     ).resolves.toEqual([]);
+  });
+
+  it("retains unplanned historical windows behind a placeholder node", async () => {
+    const sessionKey = "agent:main:unplanned-history";
+    const currentEntry: SessionEntry = {
+      sessionId: "current-planned-session",
+      updatedAt: Date.now(),
+    };
+    await replaceSessionEntry({ sessionKey, storePath }, currentEntry);
+    await replaceSqliteTranscriptEvents(
+      { sessionKey, sessionId: "current-planned-session", storePath },
+      [createTranscriptEvent("current-planned-session", "planned current transcript")],
+    );
+    await replaceSqliteTranscriptEvents(
+      { sessionKey, sessionId: "unplanned-historical-session", storePath },
+      [createTranscriptEvent("unplanned-historical-session", "retained historical transcript")],
+    );
+
+    const result = await applySessionEntryLifecycleMutation({
+      storePath,
+      removals: [
+        {
+          sessionKey,
+          expectedEntry: currentEntry,
+          archiveRemovedTranscript: false,
+        },
+      ],
+      maintenanceOverride: { mode: "enforce" },
+    });
+
+    expect(result.removedSessionKeys).toEqual([sessionKey]);
+    expect(loadSessionEntry({ sessionKey, storePath })).toBeUndefined();
+    await expect(
+      loadTranscriptEvents({
+        sessionKey,
+        sessionId: "current-planned-session",
+        storePath,
+      }),
+    ).resolves.toEqual([]);
+    await expect(
+      loadTranscriptEvents({
+        sessionKey,
+        sessionId: "unplanned-historical-session",
+        storePath,
+      }),
+    ).resolves.toEqual([
+      createTranscriptEvent("unplanned-historical-session", "retained historical transcript"),
+    ]);
+    const database = openLifecycleTestDatabase(storePath);
+    expect(
+      database.db
+        .prepare("SELECT current_session_id, entry_json FROM session_nodes WHERE session_key = ?")
+        .get(sessionKey),
+    ).toEqual({ current_session_id: "unplanned-historical-session", entry_json: "{}" });
   });
 
   it("archives shared SQLite transcript rows when any lifecycle removal requests archive", async () => {
@@ -775,6 +845,112 @@ describe("session store lifecycle mutations", () => {
     ).resolves.toEqual([]);
   });
 
+  it("rehomes a window retained through a surviving previousSessionId reference", async () => {
+    const now = Date.now();
+    await replaceSessionEntry(
+      { sessionKey: "agent:main:window-owner", storePath },
+      { sessionId: "retained-previous-session", updatedAt: now },
+    );
+    await replaceSqliteTranscriptEvents(
+      {
+        sessionKey: "agent:main:window-owner",
+        sessionId: "retained-previous-session",
+        storePath,
+      },
+      [createTranscriptEvent("retained-previous-session", "retained previous transcript")],
+    );
+    await replaceSessionEntry(
+      { sessionKey: "agent:main:window-survivor", storePath },
+      {
+        previousSessionId: "retained-previous-session",
+        sessionId: "current-survivor-session",
+        updatedAt: now + 1,
+      },
+    );
+
+    const deleted = await deleteSessionEntryLifecycle({
+      archiveTranscript: true,
+      storePath,
+      target: {
+        canonicalKey: "agent:main:window-owner",
+        storeKeys: ["agent:main:window-owner"],
+      },
+    });
+
+    expect(deleted.deleted).toBe(true);
+    expect(deleted.archivedTranscripts).toEqual([]);
+    await expect(
+      loadTranscriptEvents({
+        sessionKey: "agent:main:window-survivor",
+        sessionId: "retained-previous-session",
+        storePath,
+      }),
+    ).resolves.toEqual([
+      createTranscriptEvent("retained-previous-session", "retained previous transcript"),
+    ]);
+    const database = openLifecycleTestDatabase(storePath);
+    expect(
+      database.db
+        .prepare("SELECT session_key FROM session_windows WHERE session_id = ?")
+        .get("retained-previous-session"),
+    ).toEqual({ session_key: "agent:main:window-survivor" });
+  });
+
+  it("revalidates cleanup entries before deleting their transcript state", async () => {
+    const sessionKey = "agent:main:cleanup-race";
+    const sessionId = "cleanup-race-session";
+    const now = Date.now();
+    await replaceSessionEntry({ sessionKey, storePath }, { sessionId, updatedAt: now });
+    await replaceSqliteTranscriptEvents({ sessionKey, sessionId, storePath }, [
+      createTranscriptEvent(sessionId, "cleanup-race-marker transcript"),
+    ]);
+    const database = openLifecycleTestDatabase(storePath);
+    const cleanupNow = Date.now() + 60_000;
+    const planned = planSqliteSessionLifecycleArtifactCleanup(database, {
+      archiveRemovedEntryTranscripts: true,
+      archiveDirectory: path.dirname(storePath),
+      sessionKeySegmentPrefix: "cleanup-race",
+      transcriptContentMarker: "cleanup-race-marker",
+      orphanTranscriptMinAgeMs: 0,
+      nowMs: cleanupNow,
+    });
+    expect(planned.entries).toHaveLength(1);
+    expect(planned.deletePlans).toHaveLength(1);
+    const refreshedEntry = { label: "refreshed", sessionId, updatedAt: now + 1 };
+    const originalRenameSync = fs.renameSync;
+    let refreshed = false;
+    const renameSpy = vi.spyOn(fs, "renameSync").mockImplementation((...args) => {
+      const result = originalRenameSync(...args);
+      if (!refreshed && String(args[1]).includes(`${sessionId}.jsonl.deleted.`)) {
+        refreshed = true;
+        database.db
+          .prepare("UPDATE session_nodes SET entry_json = ?, updated_at = ? WHERE session_key = ?")
+          .run(JSON.stringify(refreshedEntry), refreshedEntry.updatedAt, sessionKey);
+      }
+      return result;
+    });
+
+    try {
+      await expect(
+        cleanupSessionLifecycleArtifacts({
+          storePath,
+          sessionKeySegmentPrefix: "cleanup-race",
+          transcriptContentMarker: "cleanup-race-marker",
+          orphanTranscriptMinAgeMs: 0,
+          nowMs: cleanupNow,
+        }),
+      ).rejects.toThrow("SQLite lifecycle cleanup entry changed");
+    } finally {
+      renameSpy.mockRestore();
+    }
+
+    expect(refreshed).toBe(true);
+    expect(loadSessionEntry({ sessionKey, storePath })).toEqual(refreshedEntry);
+    await expect(loadTranscriptEvents({ sessionKey, sessionId, storePath })).resolves.toEqual([
+      createTranscriptEvent(sessionId, "cleanup-race-marker transcript"),
+    ]);
+  });
+
   it("preserves raw SQLite entry references during lifecycle cleanup", async () => {
     const sessionId = "raw-shared-session";
     await replaceSessionEntry(
@@ -794,7 +970,7 @@ describe("session store lifecycle mutations", () => {
     executeSqliteQuerySync(
       database.db,
       db
-        .updateTable("session_entries")
+        .updateTable("session_nodes")
         .set({ entry_json: "{not valid json" })
         .where("session_key", "=", "agent:main:protected-raw-reference"),
     );
@@ -812,7 +988,7 @@ describe("session store lifecycle mutations", () => {
       executeSqliteQueryTakeFirstSync(
         database.db,
         db
-          .selectFrom("session_entries")
+          .selectFrom("session_nodes")
           .select("session_key")
           .where("session_key", "=", "agent:main:cleanup-target"),
       ),
@@ -821,18 +997,18 @@ describe("session store lifecycle mutations", () => {
       executeSqliteQueryTakeFirstSync(
         database.db,
         db
-          .selectFrom("session_entries")
-          .select(["entry_json", "session_id"])
+          .selectFrom("session_nodes")
+          .select(["entry_json", "current_session_id"])
           .where("session_key", "=", "agent:main:protected-raw-reference"),
       ),
     ).toEqual({
       entry_json: "{not valid json",
-      session_id: sessionId,
+      current_session_id: sessionId,
     });
     expect(
       executeSqliteQueryTakeFirstSync(
         database.db,
-        db.selectFrom("sessions").select("session_id").where("session_id", "=", sessionId),
+        db.selectFrom("session_windows").select("session_id").where("session_id", "=", sessionId),
       )?.session_id,
     ).toBe(sessionId);
   });
