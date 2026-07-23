@@ -13,6 +13,7 @@ import {
   resolveSessionTranscriptReadTarget,
   type SessionTranscriptMessageEvent,
   type SessionTranscriptReadScope,
+  type TranscriptEvent,
 } from "../config/sessions/session-accessor.js";
 import { parseSqliteSessionFileMarker } from "../config/sessions/sqlite-marker.js";
 import { hasInterSessionUserProvenance } from "../sessions/input-provenance.js";
@@ -52,7 +53,9 @@ type SessionTitleFields = {
 
 export type ReadRecentSessionMessagesResult = {
   messages: unknown[];
+  transcriptEvents?: TranscriptEvent[];
   transcriptPath?: string;
+  transcriptSource?: "active" | "reset-archive";
   totalMessages: number;
 };
 
@@ -190,11 +193,16 @@ function normalizeRecentSqliteReadOptions(opts?: Partial<ReadRecentSessionMessag
 async function readRecentSqliteMessageRecords(
   target: ResolvedTranscriptReadTarget,
   opts?: Partial<ReadRecentSessionMessagesOptions>,
-): Promise<{ records: SqliteMessageRecord[]; totalMessages: number }> {
+): Promise<{
+  records: SqliteMessageRecord[];
+  transcriptEvents: TranscriptEvent[];
+  totalMessages: number;
+}> {
   const normalized = normalizeRecentSqliteReadOptions(opts);
   const page = readRecentSessionTranscriptMessageEvents(toTranscriptReadScope(target), normalized);
   return {
     records: extractMessageRecordsFromEventEntries(page.events),
+    transcriptEvents: page.events.map((entry) => entry.event),
     totalMessages: page.totalMessages,
   };
 }
@@ -580,7 +588,10 @@ export async function readRecentSessionMessagesWithStatsAsync(
 ): Promise<ReadRecentSessionMessagesResult> {
   const target = resolveTranscriptReadTarget(scope);
   if (isSqliteReadTarget(target)) {
-    const { records, totalMessages } = await readRecentSqliteMessageRecords(target, opts);
+    const { records, transcriptEvents, totalMessages } = await readRecentSqliteMessageRecords(
+      target,
+      opts,
+    );
     if (totalMessages === 0 && records.length === 0 && opts.allowResetArchiveFallback === true) {
       return await readRecentSessionMessagesWithStatsAsyncFile(
         target.sessionId,
@@ -592,8 +603,10 @@ export async function readRecentSessionMessagesWithStatsAsync(
     }
     return {
       messages: records.map(sqliteRecordMessageWithSeq),
+      transcriptEvents,
       totalMessages,
       transcriptPath: target.sessionFile,
+      transcriptSource: "active",
     };
   }
   return await readRecentSessionMessagesWithStatsAsyncFile(
@@ -624,8 +637,10 @@ export async function readSessionMessagesPageWithStatsAsync(
     }
     return {
       messages: extractMessageRecordsFromEventEntries(page.events).map(sqliteRecordMessageWithSeq),
+      transcriptEvents: page.events.map((entry) => entry.event),
       totalMessages: page.totalMessages,
       transcriptPath: target.sessionFile,
+      transcriptSource: "active",
     };
   }
   return await readSessionMessagesPageWithStatsAsyncFile(

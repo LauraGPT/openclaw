@@ -13,6 +13,7 @@ import {
   setLastActiveSessionKey,
   type ChatFollowUpMode,
 } from "../../app/settings.ts";
+import { t } from "../../i18n/index.ts";
 import type {
   ChatAttachment,
   ChatQueueItem,
@@ -53,7 +54,12 @@ import {
   type ChatCommandResetOptions,
   shouldQueueLocalSlashCommand,
 } from "./chat-commands.ts";
-import { loadChatHistory, type ChatHistoryResult, type ChatState } from "./chat-history.ts";
+import {
+  loadChatBranches,
+  loadChatHistory,
+  type ChatHistoryResult,
+  type ChatState,
+} from "./chat-history.ts";
 import {
   admitQueuedMessageForSession,
   enqueueChatMessage,
@@ -128,6 +134,8 @@ export type ChatHost = ChatInputHistoryState &
     chatAttachments: ChatAttachment[];
     chatQueue: ChatQueueItem[];
     chatQueueByScope?: Record<string, ChatQueueItem[]>;
+    /** Active leaf of the history snapshot currently rendered by this pane. */
+    chatDisplayedLeafEntryId?: string | null;
     chatRunId: string | null;
     chatRunStartup?: ChatRunStartupState | null;
     chatRunUsageById?: Map<string, number>;
@@ -252,6 +260,7 @@ async function requestChatSend(
     agentId?: string;
     queueMode?: QueueMode;
     replyToId?: string;
+    expectedLeafEntryId?: string | null;
   },
 ): Promise<ChatSendAck> {
   const routing = resolveChatSendRouting(state, params);
@@ -269,6 +278,9 @@ async function requestChatSend(
     deliver: false,
     ...(params.replyToId ? { replyToId: params.replyToId } : {}),
     ...(params.queueMode ? { queueMode: params.queueMode } : {}),
+    ...(params.expectedLeafEntryId !== undefined
+      ? { expectedLeafEntryId: params.expectedLeafEntryId }
+      : {}),
     idempotencyKey: params.runId,
     attachments: buildChatApiAttachments(params.attachments),
   });
@@ -276,6 +288,16 @@ async function requestChatSend(
     state.reconnectResumeSessionId = null;
   }
   return normalizeChatSendAck(payload, params.runId);
+}
+
+function resolveDisplayedLeafEntryId(
+  state: Pick<ChatState, "chatDisplayedLeafEntryId">,
+): string | null | undefined {
+  if (state.chatDisplayedLeafEntryId === null) {
+    return null;
+  }
+  const leafEntryId = state.chatDisplayedLeafEntryId?.trim();
+  return leafEntryId || undefined;
 }
 
 function resolveChatSendRouting(
@@ -356,16 +378,26 @@ async function sendChatMessageWithGeneratedRunId(
     setChatError(state, null);
   }
   const runId = options.runId ?? generateUUID();
+  const expectedLeafEntryId = resolveDisplayedLeafEntryId(state);
   try {
     return await requestChatSend(state, {
       message: msg,
       attachments,
       runId,
+      ...(expectedLeafEntryId !== undefined ? { expectedLeafEntryId } : {}),
       ...(options.queueMode ? { queueMode: options.queueMode } : {}),
     });
   } catch (err) {
     if (canApplyError()) {
-      setChatError(state, formatConnectError(err));
+      setChatError(
+        state,
+        isActiveLeafChangedError(err)
+          ? t("chat.sendErrors.activeLeafChanged")
+          : formatConnectError(err),
+      );
+      if (isActiveLeafChangedError(err)) {
+        void Promise.all([loadChatHistory(state), loadChatBranches(state)]);
+      }
     }
     return null;
   }
@@ -501,6 +533,9 @@ function cancelPendingSendBeforeRequest(
 type QueuedChatSendResult = "sent" | "pending" | "failed";
 type QueuedChatStorageMode = "durable" | "memory";
 type QueuedChatSendOptions = {
+  /** Exact submit-time leaf for fresh foreground sends; restored drains omit it.
+   * Any intervening leaf advance intentionally parks the draft for review. */
+  expectedLeafEntryId?: string | null;
   previousAttachments?: ChatAttachment[];
   previousDraft?: string;
   routingSessionKey?: string;
@@ -548,6 +583,20 @@ const UNCERTAIN_CLEAR_SUCCESSOR_ERROR =
 const STORED_OUTBOX_RETRY_DEFAULT_MS = 500;
 const STORED_OUTBOX_RETRY_MIN_MS = 100;
 const STORED_OUTBOX_RETRY_MAX_MS = 30_000;
+const ACTIVE_LEAF_CHANGED_ERROR_REASON = "active-leaf-changed";
+
+function isActiveLeafChangedError(err: unknown): err is GatewayRequestError {
+  if (!(err instanceof GatewayRequestError)) {
+    return false;
+  }
+  const details = err.details;
+  return (
+    typeof details === "object" &&
+    details !== null &&
+    !Array.isArray(details) &&
+    (details as { reason?: unknown }).reason === ACTIVE_LEAF_CHANGED_ERROR_REASON
+  );
+}
 
 function finishScopedChatSending(host: ChatHost, scope: StoredChatOutboxScope): void {
   if (host.chatSendingScopeKey !== storedChatOutboxScopeKey(scope)) {
@@ -760,6 +809,9 @@ async function sendQueuedChatMessage(
           runId,
           sessionKey,
           agentId: prepared.agentId,
+          ...(opts?.expectedLeafEntryId !== undefined
+            ? { expectedLeafEntryId: opts.expectedLeafEntryId }
+            : {}),
           ...(prepared.replyToId ? { replyToId: prepared.replyToId } : {}),
         });
     updateChatSendAckTiming(host, runId, ack, sendingItem, requestStartedAtMs);
@@ -887,6 +939,24 @@ async function sendQueuedChatMessage(
     return retireOnAck ? "sent" : "pending";
   } catch (err) {
     finishScopedChatSending(host, sendingScope);
+    if (isActiveLeafChangedError(err)) {
+      const error = t("chat.sendErrors.activeLeafChanged");
+      updateQueuedSendItem(host, storageMode, sessionKey, id, (item) => ({
+        ...item,
+        sendError: error,
+        sendState: "failed",
+      }));
+      if (isVisibleSession()) {
+        setChatError(host, error);
+        restoreComposerAfterFailedSend(host, opts ?? {});
+        void Promise.all([
+          loadChatHistory(host as unknown as ChatState),
+          loadChatBranches(host as unknown as ChatState),
+        ]);
+      }
+      recordChatSendTiming(host, prepared, "failed", prepared.sendSubmittedAtMs, { error });
+      return "failed";
+    }
     const error = formatConnectError(err);
     const recoverable =
       err instanceof GatewayRequestError
@@ -1017,6 +1087,7 @@ async function sendChatMessageNow(
     restoreDraft?: boolean;
     attachments?: ChatAttachment[];
     previousAttachments?: ChatAttachment[];
+    expectedLeafEntryId?: string | null;
     restoreAttachments?: boolean;
     refreshSessions?: boolean;
     routingSessionKey?: string;
@@ -1056,6 +1127,9 @@ async function sendChatMessageNow(
       {
         previousDraft: opts?.previousDraft,
         previousAttachments: opts?.previousAttachments,
+        ...(opts?.expectedLeafEntryId !== undefined
+          ? { expectedLeafEntryId: opts.expectedLeafEntryId }
+          : {}),
         routingSessionKey: opts?.routingSessionKey ?? queuedSessionKey,
         storageMode,
       },
@@ -1072,6 +1146,9 @@ async function sendChatMessageNow(
     await scheduleStoredChatOutboxDrain(host, queuedOutbox, queued.id, {
       previousDraft: opts?.previousDraft,
       previousAttachments: opts?.previousAttachments,
+      ...(opts?.expectedLeafEntryId !== undefined
+        ? { expectedLeafEntryId: opts.expectedLeafEntryId }
+        : {}),
       routingSessionKey: opts?.routingSessionKey ?? queuedSessionKey,
     });
     const storedItem = listStoredChatOutboxes(host)
@@ -1909,6 +1986,7 @@ export async function handleSendChat(
   const message = (messageOverride ?? host.chatMessage).trim();
   const submittedAtMs = controlUiNowMs();
   const submittedSessionKey = host.sessionKey;
+  const expectedLeafEntryId = resolveDisplayedLeafEntryId(host as unknown as ChatState);
   const attachments = host.chatAttachments ?? [];
   const attachmentsToSend = messageOverride == null ? snapshotChatAttachments(attachments) : [];
   const hasAttachments = attachmentsToSend.length > 0;
@@ -2295,6 +2373,7 @@ export async function handleSendChat(
         restoreDraft: Boolean(messageOverride && opts?.restoreDraft),
         attachments: hasAttachments ? attachmentsToSend : undefined,
         previousAttachments: cleared.previousAttachments,
+        ...(expectedLeafEntryId !== undefined ? { expectedLeafEntryId } : {}),
         restoreAttachments: Boolean(messageOverride && opts?.restoreDraft),
         refreshSessions,
         routingSessionKey: submittedSessionKey,

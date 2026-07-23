@@ -1,4 +1,5 @@
 import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
+import { resolveSessionTranscriptActiveLeafEntryId } from "../../config/sessions/session-accessor.js";
 import {
   dropPreSessionStartAnnouncePairs,
   isHeartbeatHistoryTurnBoundaryMessage,
@@ -16,6 +17,7 @@ import {
   readRecentSessionMessagesWithStatsAsync,
   readSessionMessagesAsync,
   readSessionMessagesPageWithStatsAsync,
+  type ReadRecentSessionMessagesResult,
 } from "../session-transcript-readers.js";
 import type { loadSessionEntry } from "../session-utils.js";
 
@@ -31,6 +33,7 @@ export function readChatHistoryMessageSeq(message: unknown): number | undefined 
 }
 
 type ChatHistoryPage = {
+  activeLeafEntryId?: string | null;
   messages: unknown[];
   responseOffset?: number;
   completeCliImport?: true;
@@ -220,6 +223,7 @@ export async function readChatHistoryPage(params: {
       return { messages: [] };
     }
     return {
+      ...((offset ?? 0) === 0 ? { activeLeafEntryId: null } : {}),
       messages: [],
       ...(offset !== undefined ? { responseOffset: offset } : {}),
       pagination: { offset: offset ?? 0, totalMessages: 0, rawPageMessages: 0 },
@@ -244,7 +248,7 @@ export async function readChatHistoryPage(params: {
     const rawHistoryWindow = resolveSessionHistoryTailReadOptions(max);
     let pageOffset = offset ?? 0;
     let hasOverreadContext = false;
-    let readPage: { messages: unknown[]; totalMessages: number };
+    let readPage: ReadRecentSessionMessagesResult;
     if (messageId) {
       const anchoredPage = await readSessionMessagesAroundIdWithStatsAsync(readScope, {
         messageId,
@@ -325,6 +329,15 @@ export async function readChatHistoryPage(params: {
       return { messages: normalized };
     }
     return {
+      ...(isTailPage
+        ? {
+            activeLeafEntryId:
+              readPage.transcriptSource === "active"
+                ? (resolveSessionTranscriptActiveLeafEntryId(readPage.transcriptEvents ?? []) ??
+                  null)
+                : null,
+          }
+        : {}),
       messages: normalized,
       responseOffset: pageOffset,
       pagination: {
@@ -348,6 +361,10 @@ export async function readChatHistoryPage(params: {
   const overreadContextMessage =
     readPage.messages.length > rawHistoryWindow.maxMessages ? readPage.messages[0] : undefined;
   const turnBoundaryPending = isHeartbeatHistoryTurnBoundaryMessage(overreadContextMessage);
+  const activeLeafEntryId =
+    readPage.transcriptSource === "active"
+      ? (resolveSessionTranscriptActiveLeafEntryId(readPage.transcriptEvents ?? []) ?? null)
+      : null;
   const localMessagesWithBoundaryFilter = dropLocalHistoryOverreadContextMessage(
     dropPreSessionStartAnnouncePairs(
       readPage.messages,
@@ -395,6 +412,7 @@ export async function readChatHistoryPage(params: {
       maxChars: effectiveMaxChars,
     });
     return {
+      activeLeafEntryId,
       messages: augmentChatHistoryWithCanvasBlocks(displayMessages),
       completeCliImport: true,
       pagination: {
@@ -420,6 +438,7 @@ export async function readChatHistoryPage(params: {
     turnBoundaryPending,
   });
   return {
+    activeLeafEntryId,
     messages: augmentChatHistoryWithCanvasBlocks(displayMessages),
     pagination: {
       offset: 0,

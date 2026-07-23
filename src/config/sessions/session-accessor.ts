@@ -169,6 +169,7 @@ export {
 export {
   forkSessionAtMessage,
   listSessionBranches,
+  resolveSessionTranscriptActiveLeafEntryId,
   rewindSessionToMessage,
   switchSessionBranch,
 } from "./session-accessor.message-cut.js";

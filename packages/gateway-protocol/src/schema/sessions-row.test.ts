@@ -7,13 +7,20 @@ describe("SessionRowSchema", () => {
     const row = {
       key: "agent:main:main",
       kind: "global",
+      activeLeafEntryId: "leaf-rendered",
       createdActor: { type: "human", id: "profile-ada", label: "Ada" },
       visibility: "suggest",
       sharingRole: "owner",
     };
     const roundTripped = structuredClone(row);
 
+    expect(SessionRowSchema.properties.activeLeafEntryId).toBeDefined();
     expect(Value.Check(SessionRowSchema, roundTripped)).toBe(true);
-    expect(roundTripped).toMatchObject({ visibility: "suggest", sharingRole: "owner" });
+    expect(Value.Check(SessionRowSchema, { ...roundTripped, activeLeafEntryId: null })).toBe(true);
+    expect(roundTripped).toMatchObject({
+      activeLeafEntryId: "leaf-rendered",
+      visibility: "suggest",
+      sharingRole: "owner",
+    });
   });
 });
