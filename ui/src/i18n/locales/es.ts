@@ -599,6 +599,8 @@ export const es: TranslationMap = {
     worktreeName: "Nombre del worktree",
     worktreeNamePlaceholder: "auto",
     worktreeNameInvalid: "Los nombres de worktree usan letras minúsculas, dígitos y guiones.",
+    incognito: "Incógnito",
+    incognitoDescription: "Mantén este hilo solo hasta que se reinicie el Gateway",
     messagePlaceholder: "¿En qué debería trabajar esta sesión?",
     readingAttachment: "Leyendo archivo adjunto",
     start: "Iniciar sesión",
@@ -680,6 +682,8 @@ export const es: TranslationMap = {
     openWorkboardCard: "Abrir tarjeta de Workboard",
     dashboardAvailable: "Panel disponible",
     approvalNeeded: "Se requiere aprobación",
+    queuedMessage: "{count} mensaje en cola para enviar",
+    queuedMessages: "{count} mensajes en cola para enviar",
     noSessions: "No se encontraron sesiones.",
     noActiveSessions: "No hay hilos activos.",
     noArchivedSessions: "No hay sesiones archivadas.",
@@ -747,6 +751,7 @@ export const es: TranslationMap = {
     unread: "Unread",
     worktreeSession: "Worktree session",
     automationAttached: "Automation attached",
+    incognito: "Hilo de incógnito",
     cloudWorkerPlacement: "Trabajador en la nube: {state}",
     cloudWorkerPlacementConflict: "Worker en la nube: {state} · 1 conflicto de espacio de trabajo",
     cloudWorkerPlacementConflicts:
@@ -3064,6 +3069,7 @@ export const es: TranslationMap = {
     eventStale: "Sesión obsoleta",
   },
   connection: {
+    queuedCount: "{count} en cola",
     reconnecting: "Reconectando…",
     retryNow: "Reintentar ahora",
     access: {
@@ -3740,6 +3746,17 @@ export const es: TranslationMap = {
   },
   login: {
     subtitle: "Panel de Gateway",
+    deviceAuthMigration: {
+      banner:
+        "Este navegador aún necesita aprobación única del dispositivo después de la actualización.",
+      action: "Asegurar este navegador",
+      secureContextRequired:
+        "Este navegador heredado sigue disponible temporalmente. Vuelve a abrirlo por HTTPS o localhost para asegurarlo con la identidad del dispositivo.",
+      pendingUnavailable:
+        "La solicitud de emparejamiento del navegador aún no está disponible. Inténtalo de nuevo en un momento.",
+      loadFailed: "No se pudo cargar la solicitud de emparejamiento de este navegador: {error}",
+      approvalFailed: "No se pudo asegurar este navegador: {error}",
+    },
     passwordPlaceholder: "opcional",
     showToken: "Mostrar token",
     hideToken: "Ocultar token",
@@ -3851,6 +3868,19 @@ export const es: TranslationMap = {
     },
     outputTokens: "{count} tokens de salida",
     archivedSessionDisabled: "Restaura esta sesión para enviar mensajes.",
+    sessionSharing: {
+      menu: "Uso compartido del hilo",
+      current: "Visibilidad del hilo: {visibility}",
+      visibility: "Visibilidad",
+      shared: "Compartido",
+      readOnly: "Solo lectura",
+      suggest: "Sugerir",
+      draft: "Borrador",
+      members: "Miembros",
+      selected: "Miembro",
+      noPeople: "No se encontraron personas emparejadas.",
+      readOnlyNotice: "Solo el propietario del hilo y los miembros pueden actuar en este hilo.",
+    },
     loadOlder: "Cargar anteriores",
     sessionHeader: {
       renameTooltip: "Cambiar nombre de la sesión",
@@ -3864,6 +3894,7 @@ export const es: TranslationMap = {
       copyPath: "Copiar ruta",
       copyBranch: "Copiar nombre de la rama",
       copied: "Copiado",
+      incognito: "Hilo de incógnito",
       branches: "Ramas del hilo",
       branchSwitchUnavailable:
         "El cambio de rama no está disponible mientras el agente está trabajando.",
@@ -4155,6 +4186,7 @@ export const es: TranslationMap = {
       openInCanvas: "Abrir en lienzo",
       reply: "Responder",
       replyToMessage: "Responder al mensaje",
+      replyingTo: "Respondiendo a {name}",
       rewind: "Rebobinar",
       rewindConfirm: "¿Rebobinar hasta antes de este mensaje?",
       rewindToHere: "Rebobinar hasta aquí",
@@ -4253,6 +4285,8 @@ export const es: TranslationMap = {
       placeholderDisconnected: "Connect to the gateway to start chatting...",
       offlineHint:
         "Sin conexión: los mensajes se pondrán en cola y se enviarán cuando vuelva la conexión.",
+      offlineQueuedHint:
+        "Sin conexión — {count} en cola; los mensajes se enviarán cuando se restablezca la conexión.",
       preparingModel: "Preparando modelo...",
       responding: "{name} está respondiendo...",
       sendingMessage: "Enviando mensaje...",

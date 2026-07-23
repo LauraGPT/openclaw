@@ -599,6 +599,8 @@ export const nl: TranslationMap = {
     worktreeName: "Worktree-naam",
     worktreeNamePlaceholder: "auto",
     worktreeNameInvalid: "Worktree-namen gebruiken kleine letters, cijfers en koppeltekens.",
+    incognito: "Incognito",
+    incognitoDescription: "Bewaar dit gesprek alleen totdat de Gateway opnieuw start",
     messagePlaceholder: "Waar moet deze sessie aan werken?",
     readingAttachment: "Bijlage lezen",
     start: "Sessie starten",
@@ -680,6 +682,8 @@ export const nl: TranslationMap = {
     openWorkboardCard: "Workboard-kaart openen",
     dashboardAvailable: "Dashboard beschikbaar",
     approvalNeeded: "Goedkeuring vereist",
+    queuedMessage: "{count} bericht in wachtrij om te verzenden",
+    queuedMessages: "{count} berichten in wachtrij om te verzenden",
     noSessions: "Geen sessies gevonden.",
     noActiveSessions: "Geen actieve threads.",
     noArchivedSessions: "Geen gearchiveerde sessies.",
@@ -748,6 +752,7 @@ export const nl: TranslationMap = {
     unread: "Unread",
     worktreeSession: "Worktree session",
     automationAttached: "Automation attached",
+    incognito: "Incognito-gesprek",
     cloudWorkerPlacement: "Cloudworker: {state}",
     cloudWorkerPlacementConflict: "Cloud worker: {state} · 1 workspaceconflict",
     cloudWorkerPlacementConflicts: "Cloud worker: {state} · {count} workspaceconflicten",
@@ -3045,6 +3050,7 @@ export const nl: TranslationMap = {
     eventStale: "Verlopen sessie",
   },
   connection: {
+    queuedCount: "{count} in wachtrij",
     reconnecting: "Opnieuw verbinden…",
     retryNow: "Nu opnieuw proberen",
     access: {
@@ -3716,6 +3722,16 @@ export const nl: TranslationMap = {
   },
   login: {
     subtitle: "Gateway-dashboard",
+    deviceAuthMigration: {
+      banner: "Deze browser heeft na de update nog eenmalige apparaatgoedkeuring nodig.",
+      action: "Beveilig deze browser",
+      secureContextRequired:
+        "Deze verouderde browser blijft tijdelijk beschikbaar. Open hem opnieuw via HTTPS of localhost om hem met apparaatidentiteit te beveiligen.",
+      pendingUnavailable:
+        "Het koppelingsverzoek van de browser is nog niet beschikbaar. Probeer het zo meteen opnieuw.",
+      loadFailed: "Kan het koppelingsverzoek van deze browser niet laden: {error}",
+      approvalFailed: "Kan deze browser niet beveiligen: {error}",
+    },
     passwordPlaceholder: "optioneel",
     showToken: "Token weergeven",
     hideToken: "Token verbergen",
@@ -3827,6 +3843,20 @@ export const nl: TranslationMap = {
     },
     outputTokens: "{count} uitvoertokens",
     archivedSessionDisabled: "Herstel deze sessie om berichten te verzenden.",
+    sessionSharing: {
+      menu: "Gesprek delen",
+      current: "Zichtbaarheid gesprek: {visibility}",
+      visibility: "Zichtbaarheid",
+      shared: "Gedeeld",
+      readOnly: "Alleen-lezen",
+      suggest: "Voorstellen",
+      draft: "Concept",
+      members: "Leden",
+      selected: "Lid",
+      noPeople: "Geen gekoppelde personen gevonden.",
+      readOnlyNotice:
+        "Alleen de eigenaar en leden van de thread kunnen actie ondernemen in deze thread.",
+    },
     loadOlder: "Oudere laden",
     sessionHeader: {
       renameTooltip: "Sessie hernoemen",
@@ -3840,6 +3870,7 @@ export const nl: TranslationMap = {
       copyPath: "Pad kopiëren",
       copyBranch: "Branchnaam kopiëren",
       copied: "Gekopieerd",
+      incognito: "Incognitothread",
       branches: "Threadvertakkingen",
       branchSwitchUnavailable: "Vertakking wisselen is niet beschikbaar terwijl de agent werkt.",
       branchSwitchRequiresAdmin:
@@ -4130,6 +4161,7 @@ export const nl: TranslationMap = {
       openInCanvas: "Openen in canvas",
       reply: "Beantwoorden",
       replyToMessage: "Op bericht reageren",
+      replyingTo: "Beantwoorden aan {name}",
       rewind: "Terugspoelen",
       rewindConfirm: "Terugspoelen naar voor dit bericht?",
       rewindToHere: "Naar hier terugspoelen",
@@ -4228,6 +4260,8 @@ export const nl: TranslationMap = {
       placeholderDisconnected: "Connect to the gateway to start chatting...",
       offlineHint:
         "Offline — berichten worden in de wachtrij geplaatst en verzonden zodra de verbinding terugkeert.",
+      offlineQueuedHint:
+        "Offline — {count} in wachtrij; berichten worden verzonden zodra de verbinding terugkeert.",
       preparingModel: "Model voorbereiden...",
       responding: "{name} reageert...",
       sendingMessage: "Bericht verzenden...",

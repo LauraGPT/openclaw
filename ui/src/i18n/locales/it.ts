@@ -601,6 +601,8 @@ export const it: TranslationMap = {
     worktreeName: "Nome del worktree",
     worktreeNamePlaceholder: "auto",
     worktreeNameInvalid: "I nomi dei worktree usano lettere minuscole, cifre e trattini.",
+    incognito: "Incognito",
+    incognitoDescription: "Mantieni questa conversazione solo fino al riavvio del Gateway",
     messagePlaceholder: "Su cosa dovrebbe lavorare questa sessione?",
     readingAttachment: "Lettura allegato",
     start: "Avvia sessione",
@@ -682,6 +684,8 @@ export const it: TranslationMap = {
     openWorkboardCard: "Apri scheda Workboard",
     dashboardAvailable: "Dashboard disponibile",
     approvalNeeded: "Approvazione necessaria",
+    queuedMessage: "{count} messaggio in coda per l'invio",
+    queuedMessages: "{count} messaggi in coda per l'invio",
     noSessions: "Nessuna sessione trovata.",
     noActiveSessions: "Nessun thread attivo.",
     noArchivedSessions: "Nessuna sessione archiviata.",
@@ -750,6 +754,7 @@ export const it: TranslationMap = {
     unread: "Unread",
     worktreeSession: "Worktree session",
     automationAttached: "Automation attached",
+    incognito: "Conversazione in incognito",
     cloudWorkerPlacement: "Worker cloud: {state}",
     cloudWorkerPlacementConflict: "Cloud worker: {state} · 1 conflitto di workspace",
     cloudWorkerPlacementConflicts: "Cloud worker: {state} · {count} conflitti di workspace",
@@ -3062,6 +3067,7 @@ export const it: TranslationMap = {
     eventStale: "Sessione obsoleta",
   },
   connection: {
+    queuedCount: "{count} in coda",
     reconnecting: "Riconnessione…",
     retryNow: "Riprova ora",
     access: {
@@ -3737,6 +3743,17 @@ export const it: TranslationMap = {
   },
   login: {
     subtitle: "Dashboard Gateway",
+    deviceAuthMigration: {
+      banner:
+        "Questo browser richiede ancora un'approvazione del dispositivo una tantum dopo l'aggiornamento.",
+      action: "Proteggi questo browser",
+      secureContextRequired:
+        "Questo browser legacy rimane disponibile temporaneamente. Riaprilo tramite HTTPS o localhost per proteggerlo con l'identità del dispositivo.",
+      pendingUnavailable:
+        "La richiesta di associazione del browser non è ancora disponibile. Riprova tra un momento.",
+      loadFailed: "Impossibile caricare la richiesta di associazione di questo browser: {error}",
+      approvalFailed: "Impossibile proteggere questo browser: {error}",
+    },
     passwordPlaceholder: "facoltativa",
     showToken: "Mostra token",
     hideToken: "Nascondi token",
@@ -3849,6 +3866,19 @@ export const it: TranslationMap = {
     },
     outputTokens: "{count} token di output",
     archivedSessionDisabled: "Ripristina questa sessione per inviare messaggi.",
+    sessionSharing: {
+      menu: "Condivisione conversazione",
+      current: "Visibilità conversazione: {visibility}",
+      visibility: "Visibilità",
+      shared: "Condivisa",
+      readOnly: "Sola lettura",
+      suggest: "Suggerisci",
+      draft: "Bozza",
+      members: "Membri",
+      selected: "Membro",
+      noPeople: "Nessuna persona associata trovata.",
+      readOnlyNotice: "Solo il proprietario e i membri del thread possono agire in questo thread.",
+    },
     loadOlder: "Carica precedenti",
     sessionHeader: {
       renameTooltip: "Rinomina sessione",
@@ -3862,6 +3892,7 @@ export const it: TranslationMap = {
       copyPath: "Copia percorso",
       copyBranch: "Copia nome del branch",
       copied: "Copiato",
+      incognito: "Thread in incognito",
       branches: "Ramificazioni del thread",
       branchSwitchUnavailable: "Il cambio ramo non è disponibile mentre l'agente è al lavoro.",
       branchSwitchRequiresAdmin: "Il cambio ramo richiede l'accesso amministratore dell'operatore.",
@@ -4152,6 +4183,7 @@ export const it: TranslationMap = {
       openInCanvas: "Apri nel canvas",
       reply: "Rispondi",
       replyToMessage: "Rispondi al messaggio",
+      replyingTo: "Risposta a {name}",
       rewind: "Riavvolgi",
       rewindConfirm: "Riavvolgere fino a prima di questo messaggio?",
       rewindToHere: "Riavvolgi fino a qui",
@@ -4250,6 +4282,8 @@ export const it: TranslationMap = {
       placeholderDisconnected: "Connect to the gateway to start chatting...",
       offlineHint:
         "Offline — i messaggi verranno messi in coda e inviati al ritorno della connessione.",
+      offlineQueuedHint:
+        "Offline — {count} in coda; i messaggi verranno inviati al ripristino della connessione.",
       preparingModel: "Preparazione del modello...",
       responding: "{name} sta rispondendo...",
       sendingMessage: "Invio messaggio...",

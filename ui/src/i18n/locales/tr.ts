@@ -595,6 +595,8 @@ export const tr: TranslationMap = {
     worktreeName: "Worktree adı",
     worktreeNamePlaceholder: "auto",
     worktreeNameInvalid: "Worktree adları küçük harfler, rakamlar ve tireler kullanır.",
+    incognito: "Gizli",
+    incognitoDescription: "Bu konuşmayı yalnızca Gateway yeniden başlayana kadar tut",
     messagePlaceholder: "Bu oturum ne üzerinde çalışmalı?",
     readingAttachment: "Ek okunuyor",
     start: "Oturumu başlat",
@@ -675,6 +677,8 @@ export const tr: TranslationMap = {
     openWorkboardCard: "Workboard kartını aç",
     dashboardAvailable: "Pano kullanılabilir",
     approvalNeeded: "Onay gerekli",
+    queuedMessage: "{count} mesaj gönderilmek üzere sıraya alındı",
+    queuedMessages: "{count} mesaj gönderilmek üzere sıraya alındı",
     noSessions: "Oturum bulunamadı.",
     noActiveSessions: "Etkin konu yok.",
     noArchivedSessions: "Arşivlenmiş oturum yok.",
@@ -743,6 +747,7 @@ export const tr: TranslationMap = {
     unread: "Unread",
     worktreeSession: "Worktree session",
     automationAttached: "Automation attached",
+    incognito: "Gizli konuşma",
     cloudWorkerPlacement: "Bulut çalışanı: {state}",
     cloudWorkerPlacementConflict: "Bulut işçisi: {state} · 1 çalışma alanı çakışması",
     cloudWorkerPlacementConflicts: "Bulut işçisi: {state} · {count} çalışma alanı çakışması",
@@ -3045,6 +3050,7 @@ export const tr: TranslationMap = {
     eventStale: "Eski oturum",
   },
   connection: {
+    queuedCount: "{count} sırada",
     reconnecting: "Yeniden bağlanıyor…",
     retryNow: "Şimdi yeniden dene",
     access: {
@@ -3716,6 +3722,16 @@ export const tr: TranslationMap = {
   },
   login: {
     subtitle: "Gateway Kontrol Paneli",
+    deviceAuthMigration: {
+      banner: "Bu tarayıcı, güncellemeden sonra hâlâ tek seferlik cihaz onayına ihtiyaç duyuyor.",
+      action: "Bu tarayıcıyı güvenceye al",
+      secureContextRequired:
+        "Bu eski tarayıcı geçici olarak kullanılabilir durumda. Cihaz kimliğiyle güvenceye almak için HTTPS veya localhost üzerinden yeniden açın.",
+      pendingUnavailable:
+        "Tarayıcı eşleştirme isteği henüz kullanılabilir değil. Birazdan tekrar deneyin.",
+      loadFailed: "Bu tarayıcının eşleştirme isteği yüklenemedi: {error}",
+      approvalFailed: "Bu tarayıcı güvenceye alınamadı: {error}",
+    },
     passwordPlaceholder: "isteğe bağlı",
     showToken: "Tokenı göster",
     hideToken: "Token'ı gizle",
@@ -3827,6 +3843,19 @@ export const tr: TranslationMap = {
     },
     outputTokens: "{count} çıktı belirteci",
     archivedSessionDisabled: "Mesaj göndermek için bu oturumu geri yükleyin.",
+    sessionSharing: {
+      menu: "Konuşma paylaşımı",
+      current: "Konuşma görünürlüğü: {visibility}",
+      visibility: "Görünürlük",
+      shared: "Paylaşılan",
+      readOnly: "Salt okunur",
+      suggest: "Öner",
+      draft: "Taslak",
+      members: "Üyeler",
+      selected: "Üye",
+      noPeople: "Eşleştirilmiş kişi bulunamadı.",
+      readOnlyNotice: "Bu başlıkta yalnızca başlık sahibi ve üyeler işlem yapabilir.",
+    },
     loadOlder: "Daha eskileri yükle",
     sessionHeader: {
       renameTooltip: "Oturumu yeniden adlandır",
@@ -3840,6 +3869,7 @@ export const tr: TranslationMap = {
       copyPath: "Yolu kopyala",
       copyBranch: "Dal adını kopyala",
       copied: "Kopyalandı",
+      incognito: "Gizli başlık",
       branches: "İş parçacığı dalları",
       branchSwitchUnavailable: "Aracı çalışırken dal değiştirilemez.",
       branchSwitchRequiresAdmin: "Dal değiştirme, operatör yönetici erişimi gerektirir.",
@@ -4129,6 +4159,7 @@ export const tr: TranslationMap = {
       openInCanvas: "Kanvasta aç",
       reply: "Yanıtla",
       replyToMessage: "Mesajı yanıtla",
+      replyingTo: "{name} kişisine yanıt veriliyor",
       rewind: "Geri sar",
       rewindConfirm: "Bu mesajdan öncesine geri sarılsın mı?",
       rewindToHere: "Buraya geri sar",
@@ -4227,6 +4258,8 @@ export const tr: TranslationMap = {
       placeholderDisconnected: "Connect to the gateway to start chatting...",
       offlineHint:
         "Çevrimdışı — mesajlar sıraya alınacak ve bağlantı geri geldiğinde gönderilecek.",
+      offlineQueuedHint:
+        "Çevrimdışı — {count} kuyrukta; bağlantı geri geldiğinde mesajlar gönderilir.",
       preparingModel: "Model hazırlanıyor...",
       responding: "{name} yanıtlıyor...",
       sendingMessage: "Mesaj gönderiliyor...",

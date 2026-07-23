@@ -600,6 +600,8 @@ export const pl: TranslationMap = {
     worktreeName: "Nazwa worktree",
     worktreeNamePlaceholder: "auto",
     worktreeNameInvalid: "Nazwy worktree używają małych liter, cyfr i myślników.",
+    incognito: "Tryb incognito",
+    incognitoDescription: "Zachowaj ten wątek tylko do momentu ponownego uruchomienia Gateway",
     messagePlaceholder: "Nad czym ma pracować ta sesja?",
     readingAttachment: "Odczytywanie załącznika",
     start: "Rozpocznij sesję",
@@ -680,6 +682,8 @@ export const pl: TranslationMap = {
     openWorkboardCard: "Otwórz kartę Workboard",
     dashboardAvailable: "Pulpit dostępny",
     approvalNeeded: "Wymagane zatwierdzenie",
+    queuedMessage: "{count} wiadomość w kolejce do wysłania",
+    queuedMessages: "{count} wiadomości w kolejce do wysłania",
     noSessions: "Nie znaleziono sesji.",
     noActiveSessions: "Brak aktywnych wątków.",
     noArchivedSessions: "Brak zarchiwizowanych sesji.",
@@ -748,6 +752,7 @@ export const pl: TranslationMap = {
     unread: "Unread",
     worktreeSession: "Worktree session",
     automationAttached: "Automation attached",
+    incognito: "Wątek incognito",
     cloudWorkerPlacement: "Worker chmurowy: {state}",
     cloudWorkerPlacementConflict: "Cloud worker: {state} · 1 konflikt obszaru roboczego",
     cloudWorkerPlacementConflicts: "Cloud worker: {state} · {count} konfliktów obszarów roboczych",
@@ -3056,6 +3061,7 @@ export const pl: TranslationMap = {
     eventStale: "Nieaktualna sesja",
   },
   connection: {
+    queuedCount: "{count} w kolejce",
     reconnecting: "Ponowne łączenie…",
     retryNow: "Spróbuj ponownie teraz",
     access: {
@@ -3730,6 +3736,16 @@ export const pl: TranslationMap = {
   },
   login: {
     subtitle: "Panel Gateway",
+    deviceAuthMigration: {
+      banner: "Ta przeglądarka nadal wymaga jednorazowej zgody urządzenia po aktualizacji.",
+      action: "Zabezpiecz tę przeglądarkę",
+      secureContextRequired:
+        "Ta starsza przeglądarka pozostaje tymczasowo dostępna. Otwórz ją ponownie przez HTTPS lub localhost, aby zabezpieczyć ją tożsamością urządzenia.",
+      pendingUnavailable:
+        "Żądanie parowania przeglądarki nie jest jeszcze dostępne. Spróbuj ponownie za chwilę.",
+      loadFailed: "Nie można załadować żądania parowania tej przeglądarki: {error}",
+      approvalFailed: "Nie można zabezpieczyć tej przeglądarki: {error}",
+    },
     passwordPlaceholder: "opcjonalne",
     showToken: "Pokaż token",
     hideToken: "Ukryj token",
@@ -3838,6 +3854,19 @@ export const pl: TranslationMap = {
     },
     outputTokens: "{count} tokenów wyjściowych",
     archivedSessionDisabled: "Przywróć tę sesję, aby wysyłać wiadomości.",
+    sessionSharing: {
+      menu: "Udostępnianie wątku",
+      current: "Widoczność wątku: {visibility}",
+      visibility: "Widoczność",
+      shared: "Udostępniony",
+      readOnly: "Tylko do odczytu",
+      suggest: "Zasugeruj",
+      draft: "Wersja robocza",
+      members: "Członkowie",
+      selected: "Członek",
+      noPeople: "Nie znaleziono sparowanych osób.",
+      readOnlyNotice: "Tylko właściciel wątku i członkowie mogą działać w tym wątku.",
+    },
     loadOlder: "Załaduj starsze",
     sessionHeader: {
       renameTooltip: "Zmień nazwę sesji",
@@ -3851,6 +3880,7 @@ export const pl: TranslationMap = {
       copyPath: "Kopiuj ścieżkę",
       copyBranch: "Kopiuj nazwę gałęzi",
       copied: "Skopiowano",
+      incognito: "Wątek incognito",
       branches: "Odgałęzienia wątku",
       branchSwitchUnavailable: "Przełączanie odgałęzień jest niedostępne, gdy agent pracuje.",
       branchSwitchRequiresAdmin: "Przełączanie gałęzi wymaga dostępu administratora operatora.",
@@ -4141,6 +4171,7 @@ export const pl: TranslationMap = {
       openInCanvas: "Otwórz w kanwie",
       reply: "Odpowiedz",
       replyToMessage: "Odpowiedz na wiadomość",
+      replyingTo: "Odpowiadasz na {name}",
       rewind: "Cofnij",
       rewindConfirm: "Cofnąć do stanu sprzed tej wiadomości?",
       rewindToHere: "Cofnij do tego miejsca",
@@ -4239,6 +4270,8 @@ export const pl: TranslationMap = {
       placeholderDisconnected: "Connect to the gateway to start chatting...",
       offlineHint:
         "Offline — wiadomości zostaną umieszczone w kolejce i wysłane po przywróceniu połączenia.",
+      offlineQueuedHint:
+        "Offline — {count} w kolejce; wiadomości zostaną wysłane po przywróceniu połączenia.",
       preparingModel: "Przygotowywanie modelu...",
       responding: "{name} odpowiada...",
       sendingMessage: "Wysyłanie wiadomości...",

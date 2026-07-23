@@ -606,6 +606,8 @@ export const fr: TranslationMap = {
     worktreeNamePlaceholder: "auto",
     worktreeNameInvalid:
       "Les noms de worktree utilisent des lettres minuscules, des chiffres et des tirets.",
+    incognito: "Navigation privée",
+    incognitoDescription: "Conserver ce fil uniquement jusqu'au redémarrage du Gateway",
     messagePlaceholder: "Sur quoi cette session doit-elle travailler ?",
     readingAttachment: "Lecture de la pièce jointe",
     start: "Démarrer la session",
@@ -687,6 +689,8 @@ export const fr: TranslationMap = {
     openWorkboardCard: "Ouvrir la carte Workboard",
     dashboardAvailable: "Tableau de bord disponible",
     approvalNeeded: "Approbation requise",
+    queuedMessage: "{count} message en attente d'envoi",
+    queuedMessages: "{count} messages en attente d'envoi",
     noSessions: "Aucune session trouvée.",
     noActiveSessions: "Aucun fil actif.",
     noArchivedSessions: "Aucune session archivée.",
@@ -755,6 +759,7 @@ export const fr: TranslationMap = {
     unread: "Unread",
     worktreeSession: "Worktree session",
     automationAttached: "Automation attached",
+    incognito: "Fil en navigation privée",
     cloudWorkerPlacement: "Worker cloud : {state}",
     cloudWorkerPlacementConflict: "Cloud worker : {state} · 1 conflit d'espace de travail",
     cloudWorkerPlacementConflicts: "Cloud worker : {state} · {count} conflits d'espace de travail",
@@ -3092,6 +3097,7 @@ export const fr: TranslationMap = {
     eventStale: "Session inactive",
   },
   connection: {
+    queuedCount: "{count} en attente",
     reconnecting: "Reconnexion…",
     retryNow: "Réessayer maintenant",
     access: {
@@ -3771,6 +3777,17 @@ export const fr: TranslationMap = {
   },
   login: {
     subtitle: "Tableau de bord Gateway",
+    deviceAuthMigration: {
+      banner:
+        "Ce navigateur nécessite encore une approbation d'appareil unique après la mise à jour.",
+      action: "Sécuriser ce navigateur",
+      secureContextRequired:
+        "Cet ancien navigateur reste disponible temporairement. Rouvrez-le via HTTPS ou localhost pour le sécuriser avec l'identité de l'appareil.",
+      pendingUnavailable:
+        "La demande d'appairage du navigateur n'est pas encore disponible. Réessayez dans un instant.",
+      loadFailed: "Impossible de charger la demande d'appairage de ce navigateur : {error}",
+      approvalFailed: "Impossible de sécuriser ce navigateur : {error}",
+    },
     passwordPlaceholder: "facultatif",
     showToken: "Afficher le jeton",
     hideToken: "Masquer le jeton",
@@ -3886,6 +3903,19 @@ export const fr: TranslationMap = {
     },
     outputTokens: "{count} jetons de sortie",
     archivedSessionDisabled: "Restaurez cette session pour envoyer des messages.",
+    sessionSharing: {
+      menu: "Partage du fil",
+      current: "Visibilité du fil : {visibility}",
+      visibility: "Visibilité",
+      shared: "Partagé",
+      readOnly: "Lecture seule",
+      suggest: "Suggérer",
+      draft: "Brouillon",
+      members: "Membres",
+      selected: "Membre",
+      noPeople: "Aucune personne associée trouvée.",
+      readOnlyNotice: "Seuls le propriétaire du fil et ses membres peuvent agir dans ce fil.",
+    },
     loadOlder: "Charger les plus anciens",
     sessionHeader: {
       renameTooltip: "Renommer la session",
@@ -3899,6 +3929,7 @@ export const fr: TranslationMap = {
       copyPath: "Copier le chemin",
       copyBranch: "Copier le nom de la branche",
       copied: "Copié",
+      incognito: "Fil incognito",
       branches: "Branches de fil",
       branchSwitchUnavailable:
         "Le changement de branche est indisponible pendant que l'agent travaille.",
@@ -4192,6 +4223,7 @@ export const fr: TranslationMap = {
       openInCanvas: "Ouvrir dans le canevas",
       reply: "Répondre",
       replyToMessage: "Répondre au message",
+      replyingTo: "Réponse à {name}",
       rewind: "Revenir en arrière",
       rewindConfirm: "Revenir avant ce message ?",
       rewindToHere: "Revenir ici",
@@ -4290,6 +4322,8 @@ export const fr: TranslationMap = {
       placeholderDisconnected: "Connect to the gateway to start chatting...",
       offlineHint:
         "Hors ligne — les messages seront mis en file d'attente et envoyés au retour de la connexion.",
+      offlineQueuedHint:
+        "Hors ligne — {count} en file d'attente ; les messages seront envoyés au retour de la connexion.",
       preparingModel: "Préparation du modèle...",
       responding: "{name} répond...",
       sendingMessage: "Envoi du message...",
