@@ -248,19 +248,33 @@ function runCiManifestFixture(options: {
           ? `throw new Error("planner import failure");\n`
           : `
           export const createChangedNodeTestShards = (changedPaths) =>
-            changedPaths.includes("src/focused.ts")
+            changedPaths.includes("src/focused.ts") ||
+            changedPaths.includes("test/scripts/sqlite-sessions-transcripts-flip-proof.built-cli.e2e.test.ts")
               ? [{
                   checkName: "changed-node-plan",
                   configs: [],
                   requiresDist: false,
                   runner: "ubuntu-24.04",
                   shardName: "changed-node-plan",
-                  targets: ["src/focused.test.ts"],
+                  targets: changedPaths.includes("src/focused.ts")
+                    ? ["src/focused.test.ts"]
+                    : ["test/scripts/sqlite-sessions-transcripts-flip-proof.built-cli.e2e.test.ts"],
                 }]
               : null;
+          export const hasBuildArtifactAffectingChange = (changedPaths) =>
+            !changedPaths.includes("test/scripts/sqlite-sessions-transcripts-flip-proof.built-cli.e2e.test.ts");
+          export const hasSqliteSessionLifecycleAffectingChange = (changedPaths) =>
+            changedPaths.includes("src/sqlite-session-owner.ts") ||
+            changedPaths.includes("test/scripts/sqlite-sessions-transcripts-flip-proof.built-cli.e2e.test.ts");
         `,
         "utf8",
       );
+      const sqliteLifecycleProof = path.join(
+        root,
+        "test/scripts/sqlite-sessions-transcripts-flip-proof.built-cli.e2e.test.ts",
+      );
+      mkdirSync(path.dirname(sqliteLifecycleProof), { recursive: true });
+      writeFileSync(sqliteLifecycleProof, "export {};\n");
       writeFileSync(
         path.join(scriptsDir, "channel-contract-test-plan.mts"),
         `export const createChannelContractTestShards = () => [{ checkName: "channel-contracts" }];\n`,
@@ -2690,29 +2704,67 @@ NODE
   it("covers Android app variants, lint, and benchmark compilation", () => {
     const workflow = readCiWorkflow();
     const source = readFileSync(".github/workflows/ci.yml", "utf8");
-    const runStep = workflow.jobs.android.steps.find(
-      (step: WorkflowStep) => step.name === "Run Android ${{ matrix.task }}",
+    const androidJob = workflow.jobs.android;
+    const runStep = expectDefined(
+      androidJob.steps.find((step: WorkflowStep) => step.name === "Run Android ${{ matrix.task }}"),
+      "Android task runner",
     );
     const nativeResourcesSetup = expectDefined(
-      workflow.jobs.android.steps.find(
+      androidJob.steps.find(
         (step: WorkflowStep) => step.name === "Setup Node environment for native resources",
       ),
       "Android native resources Node setup",
     );
+    const buildPlayCase = expectDefined(
+      runStep.run?.match(/^\s*build-play\)\n([\s\S]*?)^\s*;;$/mu)?.[1],
+      "Android build-play case",
+    );
+    const buildPlayBranches = expectDefined(
+      buildPlayCase.match(
+        /if \[ "\$GITHUB_EVENT_NAME" = "workflow_dispatch" \]; then\n([\s\S]*?)\n\s*else\n([\s\S]*?)\n\s*fi/u,
+      ),
+      "Android build-play event branches",
+    );
+    const dispatchBuild = expectDefined(buildPlayBranches[1], "hosted dispatch build branch");
+    const blacksmithBuild = expectDefined(buildPlayBranches[2], "Blacksmith build branch");
+    const readTasks = (script: string) =>
+      [...script.matchAll(/^\s+(:[a-z][A-Za-z0-9:-]*)\s*\\?$/gmu)].map((match) => match[1]);
+    const dispatchTasks = readTasks(dispatchBuild);
+    const blacksmithTasks = readTasks(blacksmithBuild);
 
     expect(source).toContain('task: useCompatibleAndroidCi ? "test-play-compat" : "test-play"');
     expect(source).toContain(
       '{ check_name: "android-test-third-party", task: "test-third-party" }',
     );
-    expect(source).toContain('check_name: "android-build-play"');
+    expect(source.match(/check_name: "android-build-play"/gu)).toHaveLength(1);
     expect(source).toContain('task: useCompatibleAndroidCi ? "build-play-compat" : "build-play"');
+    expect(androidJob.name).toBe("${{ matrix.check_name }}");
+    expect(androidJob["runs-on"]).toBe(
+      "${{ github.event_name == 'workflow_dispatch' && 'ubuntu-24.04' || (github.repository == 'openclaw/openclaw' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'openclaw/openclaw') && 'blacksmith-8vcpu-ubuntu-2404' || 'ubuntu-24.04') }}",
+    );
     expect(runStep.run).toContain(":app:testPlayDebugUnitTest");
     expect(runStep.run).toContain(":app:testThirdPartyDebugUnitTest");
-    expect(runStep.run).toContain(":app:assemblePlayDebug");
-    expect(runStep.run).toContain(":app:assembleThirdPartyDebug");
-    expect(runStep.run).toContain(":app:lintPlayDebug");
-    expect(runStep.run).toContain(":app:lintThirdPartyDebug");
-    expect(runStep.run).toContain(":benchmark:assembleDebug");
+    expect(dispatchBuild.match(/^\s*\.\/gradlew\b/gmu)).toHaveLength(3);
+    expect(dispatchTasks).toEqual([
+      ":app:assemblePlayDebug",
+      ":app:lintPlayDebug",
+      ":app:assembleThirdPartyDebug",
+      ":app:lintThirdPartyDebug",
+      ":benchmark:assembleDebug",
+      ":wear-shared:assembleDebug",
+      ":wear-shared:lintDebug",
+    ]);
+    expect(new Set(dispatchTasks).size).toBe(dispatchTasks.length);
+    expect(blacksmithBuild.match(/^\s*\.\/gradlew\b/gmu)).toHaveLength(1);
+    expect(blacksmithTasks).toEqual([
+      ":app:assemblePlayDebug",
+      ":app:assembleThirdPartyDebug",
+      ":app:lintPlayDebug",
+      ":app:lintThirdPartyDebug",
+      ":benchmark:assembleDebug",
+      ":wear-shared:assembleDebug",
+      ":wear-shared:lintDebug",
+    ]);
     expect(nativeResourcesSetup.uses).toBe("./.github/actions/setup-node-env");
     expect(nativeResourcesSetup.if).toBe(
       "needs.preflight.outputs.use_compatible_android_ci != 'true'",
@@ -2828,6 +2880,7 @@ NODE
       "control-ui-i18n",
       "native-i18n",
       "qa-smoke-ci-profile",
+      "sqlite-session-lifecycle",
     ]);
     const hostedRetryJobs = new Set(["checks-ui-e2e", "checks-ui-e2e-real-gateway"]);
     for (const { jobName, stepWith } of stickyConsumers) {
@@ -4965,6 +5018,12 @@ printf '%s\n' "\${CURL_SUCCESS_IP:-203.0.113.7}"
       "matrix.task == 'max-lines-ratchet' && github.event_name == 'workflow_dispatch' && inputs.release_gate",
     );
     expect(checksFastRun.run).toContain("max-lines-ratchet)");
+    expect(checksFastRun.run).toContain("coercion-helpers)");
+    expect(checksFastRun.run).toContain("pnpm check:coercion-helpers");
+    expect(checksFastRun.run).toContain("bun-launcher)");
+    expect(checksFastRun.run).toContain(
+      "OPENCLAW_E2E_SKIP_BUILD=1 OPENCLAW_TEST_BUN_LAUNCHER=1 pnpm test test/openclaw-launcher.e2e.test.ts",
+    );
     expect(checksFastRun.run).toContain('has_package_script "check:max-lines-ratchet"');
     expect(checksFastRun.env.RATCHET_PR_HEAD_SHA).toBe(
       "${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}",
@@ -5056,6 +5115,11 @@ printf '%s\n' "\${CURL_SUCCESS_IP:-203.0.113.7}"
         runtime: "node",
         task: "max-lines-ratchet",
       },
+      {
+        check_name: "checks-fast-coercion-helpers",
+        runtime: "node",
+        task: "coercion-helpers",
+      },
     ]);
   });
 
@@ -5106,6 +5170,7 @@ printf '%s\n' "\${CURL_SUCCESS_IP:-203.0.113.7}"
     expect(current.outputs.run_native_i18n).toBe("true");
     expect(current.outputs.run_openclawkit_tests).toBe("true");
     expect(current.outputs.run_qa_smoke_ci).toBe("true");
+    expect(current.outputs.run_sqlite_session_lifecycle).toBe("true");
     expect(current.outputs.run_channel_contracts_shards).toBe("true");
     expect(current.outputs.run_protocol_event_coverage).toBe("true");
     expect(current.outputs.run_format_check).toBe("true");
@@ -5188,6 +5253,25 @@ printf '%s\n' "\${CURL_SUCCESS_IP:-203.0.113.7}"
       }),
     ]);
     expect(changedPullRequest.outputs.run_checks_node_core_dist).toBe("true");
+    expect(changedPullRequest.outputs.run_sqlite_session_lifecycle).toBe("false");
+
+    const sqliteLifecyclePullRequest = runCiManifestFixture({
+      bundledPlanner: true,
+      changedPaths: ["src/sqlite-session-owner.ts"],
+      eventName: "pull_request",
+    });
+    expect(sqliteLifecyclePullRequest.status, sqliteLifecyclePullRequest.output).toBe(0);
+    expect(sqliteLifecyclePullRequest.outputs.run_sqlite_session_lifecycle).toBe("true");
+    expect(sqliteLifecyclePullRequest.outputs.run_build_artifacts).toBe("true");
+
+    const sqliteLifecycleTestPullRequest = runCiManifestFixture({
+      bundledPlanner: true,
+      changedPaths: ["test/scripts/sqlite-sessions-transcripts-flip-proof.built-cli.e2e.test.ts"],
+      eventName: "pull_request",
+    });
+    expect(sqliteLifecycleTestPullRequest.status, sqliteLifecycleTestPullRequest.output).toBe(0);
+    expect(sqliteLifecycleTestPullRequest.outputs.run_sqlite_session_lifecycle).toBe("true");
+    expect(sqliteLifecycleTestPullRequest.outputs.run_build_artifacts).toBe("true");
 
     const plannerImportFailure = runCiManifestFixture({
       bundledPlanner: true,
@@ -5776,18 +5860,40 @@ printf '%s\n' "\${CURL_SUCCESS_IP:-203.0.113.7}"
     expect(proofStep.run).toContain("Selected target predates");
   });
 
-  it("scopes cold-runner watchdog headroom to the SQLite flip proof", () => {
+  it("runs the scoped SQLite lifecycle proof against the exact built artifact", () => {
     const workflow = readCiWorkflow();
     const additionalJob = workflow.jobs["check-additional-shard"];
-    const runStep = additionalJob.steps.find(
+    const additionalRunStep = additionalJob.steps.find(
       (step: WorkflowStep) => step.name === "Run additional check shard",
     );
-
-    expect(runStep.run).toContain("sqlite-session-flip-proof)");
-    expect(runStep.run).toContain(
-      'run_check "sqlite sessions/transcripts flip proof" env OPENCLAW_VITEST_NO_OUTPUT_TIMEOUT_MS=660000 node scripts/run-vitest.mjs run',
+    const lifecycleJob = workflow.jobs["sqlite-session-lifecycle"];
+    const downloadStep = lifecycleJob.steps.find(
+      (step: WorkflowStep) => step.name === "Download exact-run built runtime",
     );
-    expect(runStep.env.OPENCLAW_VITEST_NO_OUTPUT_TIMEOUT_MS).toBeUndefined();
+    const extractStep = lifecycleJob.steps.find(
+      (step: WorkflowStep) => step.name === "Extract built runtime",
+    );
+    const proofStep = lifecycleJob.steps.find(
+      (step: WorkflowStep) => step.name === "Verify SQLite session lifecycle",
+    );
+
+    expect(additionalJob.strategy.matrix.include).not.toContainEqual(
+      expect.objectContaining({ group: "sqlite-session-flip-proof" }),
+    );
+    expect(additionalRunStep.run).not.toContain("sqlite-session-flip-proof)");
+    expect(lifecycleJob.needs).toEqual(["preflight", "build-artifacts"]);
+    expect(lifecycleJob.if).toContain(
+      "needs.preflight.outputs.run_sqlite_session_lifecycle == 'true'",
+    );
+    expect(downloadStep.uses).toBe(DOWNLOAD_ARTIFACT_V8);
+    expect(downloadStep.with.name).toBe("dist-runtime-build");
+    expect(extractStep.run).toContain("dist-runtime-build.tar.zst");
+    expect(proofStep.env.OPENCLAW_E2E_USE_PREBUILT_DIST).toBe("1");
+    expect(proofStep.env.OPENCLAW_VITEST_NO_OUTPUT_TIMEOUT_MS).toBe("660000");
+    expect(proofStep.run).toContain(
+      "test/scripts/sqlite-sessions-transcripts-flip-proof.built-cli.e2e.test.ts",
+    );
+    expect(workflow.jobs["ci-gate"].needs).toContain("sqlite-session-lifecycle");
   });
 
   it("restores the dist build cache before building and saves only cache misses", () => {
@@ -6013,6 +6119,7 @@ printf '%s\n' "\${CURL_SUCCESS_IP:-203.0.113.7}"
     const selectedJobs = [
       "pnpm-store-warmup",
       "build-artifacts",
+      "sqlite-session-lifecycle",
       "native-i18n",
       "checks-ui",
       "checks-ui-e2e",

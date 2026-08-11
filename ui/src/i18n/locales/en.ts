@@ -379,6 +379,7 @@ export const en: TranslationMap = {
       impact:
         "Running sessions are interrupted and this Control UI disconnects until the Gateway is back.",
       versions: "Installed {installed} · Available {available}",
+      versionsBehind: "Installed {installed} · {available}",
       action: "Update and restart",
       macAction: "Update Mac app and restart",
     },
@@ -389,6 +390,13 @@ export const en: TranslationMap = {
     },
     sidebar: {
       campaignTarget: "{status} · {target}",
+      updating: "Updating Gateway…",
+    },
+    dialog: {
+      installing: "Installing the update on the Gateway. It restarts once the install finishes.",
+      restarting: "The Gateway is restarting. This page disconnects and reconnects on its own.",
+      notStarted:
+        "The update request went unanswered. Try again, or run `openclaw update` in the terminal.",
     },
     channel: {
       stable: "Stable",
@@ -478,13 +486,18 @@ export const en: TranslationMap = {
       managedServiceHandoffAlreadyRunning:
         "Another managed update is already running. Wait for it to complete, then refresh update status.",
       doctorFailed: "Doctor repair failed. Run `openclaw doctor --non-interactive` and retry.",
+      managedServiceHandoffFailed:
+        "The update helper stopped before finishing. Run `openclaw update` in the terminal to see why.",
+      managedServiceHandoffSpawnFailed:
+        "The Gateway could not start the update helper. Run `openclaw update` in the terminal instead.",
+      managedServiceHandoffParentTimeout:
+        "The Gateway stayed up too long for the update helper. Start the update again, or run `openclaw update`.",
       default: "See the gateway logs for the exact failure and retry once the cause is fixed.",
     },
-    postRestart: {
-      restartUnhealthy:
-        "The replacement process never became healthy and the previous process stayed up.",
-      default: "Check the gateway logs for the replacement failure.",
-    },
+    failedAtStep: "The update failed at {step}: {cause}.",
+    succeededVersion: "Gateway updated to v{version}.",
+    succeededCommit: "Gateway updated · now on {sha}.",
+    succeeded: "Gateway updated and restarted.",
   },
   devices: {
     pairing: {
@@ -680,7 +693,6 @@ export const en: TranslationMap = {
   newSession: {
     title: "New session",
     hint: "Pick where this session works, then say what to do.",
-    draftRow: "New session",
     agent: "Agent",
     where: "Where",
     gateway: "Gateway · local",
@@ -947,6 +959,7 @@ export const en: TranslationMap = {
     moveToGroupMenu: "Move to group",
     moveToGroupMenuCount: "Move {count} to group",
     removeFromGroup: "Remove from group",
+    moveBackToGroups: "Move back to Groups",
     groupMenu: "Group options for {group}",
     renameGroupMenu: "Rename group…",
     renameGroupTitle: 'Rename group "{group}"',
@@ -3945,6 +3958,7 @@ export const en: TranslationMap = {
       expired: "Expired",
       missing: "Not signed in",
       apiKey: "API key",
+      denied: "Credentials rejected",
     },
     expiresIn: "Credential expires in {time}",
     models: "{count} models",
@@ -4753,9 +4767,22 @@ export const en: TranslationMap = {
     compaction: {
       label: "Compacted history",
       savedTokens: "saved {count} tokens",
-      description:
-        "The compacted transcript is preserved as a checkpoint. Open session checkpoints to branch or restore from that compacted view.",
+      description: "The compacted transcript is preserved as a checkpoint.",
       openCheckpoints: "Open checkpoints",
+    },
+    sessionReset: {
+      label: "Session reset",
+      description: "The earlier conversation was cleared.",
+    },
+    systemNotice: {
+      restartRecovery: {
+        label: "System · restart recovery",
+        summary:
+          "Turn interrupted by a gateway restart — asked the agent to resume and finish the response.",
+      },
+      gatewayRestarted: {
+        label: "System · gateway restarted",
+      },
     },
     progressLabels: {
       shelling: "Shelling",
@@ -4940,10 +4967,10 @@ export const en: TranslationMap = {
       activity: "Activity",
       copySelection: "Copy",
       forkFromHere: "Fork from here",
-      fullContentLoadFailed: "Could not load the full message.",
       reply: "Reply",
       replyToMessage: "Reply to message",
       replyingTo: "Replying to {name}",
+      originalUnavailable: "The original message is unavailable.",
       message: "message",
       currentMessage: "current message",
       actions: "Message actions",
@@ -5029,9 +5056,15 @@ export const en: TranslationMap = {
       askLabel: "Ask the session companion",
       askPlaceholder: "Ask a question",
       askSubmit: "Ask",
-      askPending: "Checking the session…",
+      askReading: "Reading this session…",
+      askAnswering: "Answering…",
       askBusy: "The companion is already answering a question.",
+      askHistoryUnavailable: "Couldn't load this session's history.",
+      askMissing: "This session is no longer available.",
+      askModelUnavailable: "No utility model is configured for this session.",
+      askRateLimited: "The companion reached its question limit. Try again shortly.",
       askUnavailable: "The companion cannot answer right now.",
+      askRetry: "Retry",
       asOf: "as of {time}",
       health: {
         "on-track": "On track",
@@ -5302,6 +5335,15 @@ export const en: TranslationMap = {
         edit: "Edit",
         editing: "Editing",
         edited: "Edited",
+        create: "Create",
+        creating: "Creating",
+        created: "Created",
+        delete: "Delete",
+        deleting: "Deleting",
+        deleted: "Deleted",
+        change: "Change",
+        changing: "Changing",
+        changed: "Changed",
         write: "Write",
         writing: "Writing",
         wrote: "Wrote",
@@ -5317,6 +5359,8 @@ export const en: TranslationMap = {
         editsMany: "edited {count} files",
         writesOne: "created a file",
         writesMany: "created {count} files",
+        deletesOne: "deleted a file",
+        deletesMany: "deleted {count} files",
         searchesOne: "ran a search",
         searchesMany: "ran {count} searches",
         fetchesOne: "fetched a page",
