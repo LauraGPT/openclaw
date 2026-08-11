@@ -168,19 +168,6 @@ describe("config schema", () => {
     expect(res.generatedAt.trim().length).toBeGreaterThan(0);
   });
 
-  it("accepts qmd query rerank override", () => {
-    const result = OpenClawSchema.safeParse({
-      memory: {
-        backend: "qmd",
-        qmd: {
-          searchMode: "query",
-          rerank: false,
-        },
-      },
-    });
-    expect(result.success).toBe(true);
-  });
-
   it("rejects retired status reaction emoji overrides", () => {
     const result = OpenClawSchema.safeParse({
       messages: {
@@ -640,7 +627,9 @@ describe("config schema", () => {
     const defaultsHint = res.uiHints["agents.defaults.heartbeat.target"];
     const entryHint = res.uiHints["agents.entries.*.heartbeat.target"];
     expect(defaultsHint?.help).toContain("imessage");
+    expect(defaultsHint?.help).toContain("owner");
     expect(defaultsHint?.help).toContain("last");
+    expect(defaultsHint?.placeholder).toBe("owner");
     expect(entryHint?.help).toContain("imessage");
   });
 

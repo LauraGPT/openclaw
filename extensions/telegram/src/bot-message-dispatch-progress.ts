@@ -1,7 +1,4 @@
-// Telegram plugin module owns the ephemeral progress window and collapse summary.
 import {
-  buildChannelProgressDraftLine,
-  buildChannelProgressDraftLineForEntry,
   createChannelProgressDraftCompositor,
   isChannelProgressDraftWorkToolName,
   resolveChannelStreamingPreviewToolProgress,
@@ -83,6 +80,7 @@ export function createTelegramProgressController(params: {
     commentaryLinePrefix: "💬 ",
     commentaryItalics: false,
     updateOnLineChange: true,
+    shouldStartNow: (line) => typeof line !== "string" && line?.kind === "tool",
     // renderTelegramProgressDraftPreview draws the work lines from `lines` in
     // headline/checklist mode, so they must not also arrive inside the text.
     rendersRollingLinesNatively: true,
@@ -119,6 +117,8 @@ export function createTelegramProgressController(params: {
       !finalAnswerDeliveryStarted &&
       !finalAnswerDelivered,
     );
+  const pushEvent = async (fn: () => Promise<boolean>) =>
+    canPushToolProgress() ? await fn() : false;
   const pushToolProgress = async (
     line?: string | ChannelProgressDraftLine,
     options?: { toolName?: string; startImmediately?: boolean },
@@ -217,33 +217,22 @@ export function createTelegramProgressController(params: {
         summary.closeCommentaryBurst();
       }
     }
-    const progressPromise = pushToolProgress(
-      buildChannelProgressDraftLineForEntry(
-        params.telegramCfg,
-        {
-          event: "tool",
-          itemId: payload.itemId,
-          toolCallId: payload.toolCallId,
-          name: toolName,
-          phase: payload.phase,
-          args: payload.args,
-        },
-        payload.detailMode ? { detailMode: payload.detailMode } : undefined,
-      ),
-      { toolName, startImmediately: true },
-    );
+    const progressPromise = pushEvent(() => compositor.pushToolEvent(payload));
     if (params.statusReactionController && toolName) {
       await params.statusReactionController.setTool(toolName);
     }
-    await progressPromise;
+    return await progressPromise;
   };
   const handleItemEvent = async (payload: CallbackPayload<"onItemEvent">) => {
     if (payload.kind === "preamble") {
       if (verboseProgressActive()) {
-        return;
+        return false;
       }
+      let rendered = false;
       if (params.streamMode === "progress") {
-        await compositor.pushPreambleHeadline(payload.progressText, { itemId: payload.itemId });
+        rendered = await compositor.pushPreambleHeadline(payload.progressText, {
+          itemId: payload.itemId,
+        });
       }
       if (params.streamMode === "progress" && compositor.commentaryProgressEnabled) {
         const accepted = await compositor.pushCommentaryProgress(payload.progressText, {
@@ -252,81 +241,20 @@ export function createTelegramProgressController(params: {
         if (accepted) {
           summary.noteCommentary(payload.itemId, payload.progressText);
         }
+        rendered ||= accepted;
       }
-      return;
+      return rendered;
     }
-    await pushToolProgress(
-      buildChannelProgressDraftLineForEntry(params.telegramCfg, {
-        event: "item",
-        itemId: payload.itemId,
-        toolCallId: payload.toolCallId,
-        itemKind: payload.kind,
-        title: payload.title,
-        name: payload.name,
-        phase: payload.phase,
-        status: payload.status,
-        summary: payload.summary,
-        progressText: payload.progressText,
-        meta: payload.meta,
-      }),
-    );
+    return await pushEvent(() => compositor.pushItemEvent(payload));
   };
   const handlePlanUpdate = async (payload: CallbackPayload<"onPlanUpdate">) => {
     if (payload.phase === "update" && canPushToolProgress()) {
-      await compositor.pushPlanProgress(payload.steps, {
+      return await compositor.pushPlanProgress(payload.steps, {
         explanation: payload.explanation,
       });
     }
+    return false;
   };
-  const handleApprovalEvent = async (payload: CallbackPayload<"onApprovalEvent">) => {
-    if (payload.phase === "requested") {
-      await pushToolProgress(
-        buildChannelProgressDraftLine({
-          event: "approval",
-          phase: payload.phase,
-          title: payload.title,
-          command: payload.command,
-          reason: payload.reason,
-          message: payload.message,
-        }),
-      );
-    }
-  };
-  const handleCommandOutput = async (payload: CallbackPayload<"onCommandOutput">) => {
-    if (payload.phase === "end") {
-      await pushToolProgress(
-        buildChannelProgressDraftLineForEntry(params.telegramCfg, {
-          event: "command-output",
-          itemId: payload.itemId,
-          toolCallId: payload.toolCallId,
-          phase: payload.phase,
-          title: payload.title,
-          name: payload.name,
-          status: payload.status,
-          exitCode: payload.exitCode,
-        }),
-      );
-    }
-  };
-  const handlePatchSummary = async (payload: CallbackPayload<"onPatchSummary">) => {
-    if (payload.phase === "end") {
-      await pushToolProgress(
-        buildChannelProgressDraftLine({
-          event: "patch",
-          itemId: payload.itemId,
-          toolCallId: payload.toolCallId,
-          phase: payload.phase,
-          title: payload.title,
-          name: payload.name,
-          added: payload.added,
-          modified: payload.modified,
-          deleted: payload.deleted,
-          summary: payload.summary,
-        }),
-      );
-    }
-  };
-
   return {
     applyCollapseSummary,
     beginQueuedFollowup: () => {
@@ -341,10 +269,13 @@ export function createTelegramProgressController(params: {
     commentaryProgressEnabled: compositor.commentaryProgressEnabled,
     finalAnswerDelivered: () => finalAnswerDelivered,
     finalAnswerDeliveryStarted: () => finalAnswerDeliveryStarted,
-    handleApprovalEvent,
-    handleCommandOutput,
+    handleApprovalEvent: (payload: CallbackPayload<"onApprovalEvent">) =>
+      pushEvent(() => compositor.pushApprovalEvent(payload)),
+    handleCommandOutput: (payload: CallbackPayload<"onCommandOutput">) =>
+      pushEvent(() => compositor.pushCommandOutputEvent(payload)),
     handleItemEvent,
-    handlePatchSummary,
+    handlePatchSummary: (payload: CallbackPayload<"onPatchSummary">) =>
+      pushEvent(() => compositor.pushPatchEvent(payload)),
     handlePlanUpdate,
     handleToolStart,
     markFinalDelivered,
