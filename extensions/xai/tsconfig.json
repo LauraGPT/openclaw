@@ -353,6 +353,9 @@
       "openclaw/plugin-sdk/realtime-transcription": [
         "../../packages/plugin-sdk/dist/src/plugin-sdk/realtime-transcription.d.ts"
       ],
+      "openclaw/plugin-sdk/realtime-transcription-runtime": [
+        "../../packages/plugin-sdk/dist/src/plugin-sdk/realtime-transcription-runtime.d.ts"
+      ],
       "openclaw/plugin-sdk/realtime-bootstrap-context": [
         "../../packages/plugin-sdk/dist/src/plugin-sdk/realtime-bootstrap-context.d.ts"
       ],
