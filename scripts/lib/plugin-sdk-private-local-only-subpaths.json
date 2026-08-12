@@ -130,7 +130,6 @@
   "qa-runner-runtime",
   "qa-runtime",
   "realtime-bootstrap-context",
-  "realtime-transcription",
   "realtime-voice",
   "realtime-voice-activation",
   "realtime-voice-audio-queue",

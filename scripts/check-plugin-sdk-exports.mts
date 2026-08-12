@@ -69,6 +69,7 @@ let missing = 0;
       join(consumerRoot, "index.ts"),
       `import { buildChannelConfigSchema, DmPolicySchema } from "openclaw/plugin-sdk/channel-config-schema";
 import { defineChannelPluginEntry } from "openclaw/plugin-sdk/core";
+import { createRealtimeTranscriptionWebSocketSession } from "openclaw/plugin-sdk/realtime-transcription";
 import { createPluginRuntimeStore, type PluginRuntime } from "openclaw/plugin-sdk/runtime-store";
 import { z } from "zod";
 
@@ -79,6 +80,15 @@ const runtimeStore = createPluginRuntimeStore<PluginRuntime>({
 export const configSchema = buildChannelConfigSchema(
   z.object({ dmPolicy: DmPolicySchema.optional() }),
 );
+
+export const transcriptionSession = createRealtimeTranscriptionWebSocketSession({
+  providerId: "package-consumer",
+  callbacks: {},
+  url: "wss://api.example.com/v1/realtime-transcription",
+  protocols: ["binary"],
+  readyOnOpen: true,
+  sendAudio: () => {},
+});
 
 declare const plugin: Parameters<typeof defineChannelPluginEntry>[0]["plugin"];
 export default defineChannelPluginEntry({

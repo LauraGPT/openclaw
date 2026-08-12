@@ -748,6 +748,20 @@ describe("plugin-sdk package contract guardrails", () => {
     expect(failures).toStrictEqual([]);
   });
 
+  it("ships realtime transcription as a typed public SDK subpath", () => {
+    const subpath = "realtime-transcription";
+
+    expect({
+      public: publicPluginSdkEntrypoints.includes(subpath),
+      typed: collectTypedPluginSdkPackageExports().has(subpath),
+      packExcluded: collectPackExcludedPluginSdkDeclarations().has(subpath),
+    }).toEqual({
+      public: true,
+      typed: true,
+      packExcluded: false,
+    });
+  });
+
   it("keeps deprecated public SDK subpaths unused by extension production code", () => {
     const publicEntrypoints = new Set(publicPluginSdkEntrypoints);
     const unknownDeprecated = deprecatedPublicPluginSdkEntrypoints.filter(

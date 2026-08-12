@@ -788,6 +788,8 @@ catalog, API-key auth, and dynamic model resolution.
         only maps upstream events.
 
         ```typescript
+        import { createRealtimeTranscriptionWebSocketSession } from "openclaw/plugin-sdk/realtime-transcription";
+
         api.registerRealtimeTranscriptionProvider({
           id: "acme-ai",
           label: "Acme Realtime Transcription",

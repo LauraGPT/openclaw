@@ -185,7 +185,8 @@ export function readPluginSdkSurfaceBudgets(env: NodeJS.ProcessEnv = process.env
       // +1: dependency-light channel streaming config readers for doctor closures
       //     (realtime-voice-activation is private-local and not counted here).
       // +1: registry-bound plugin command planning and exact selected execution.
-      144,
+      // +1: typed realtime transcription provider and WebSocket session contract.
+      145,
       env,
     ),
     publicExports: readPluginSdkSurfaceBudgetEnv(
@@ -266,7 +267,8 @@ export function readPluginSdkSurfaceBudgets(env: NodeJS.ProcessEnv = process.env
       // +2: narrow channel agent-run terminal reader and outcome contract.
       // +5: narrow string, record, and error coercion helpers.
       // +1: normalized Gateway public origin resolver for plugin-generated links.
-      4308,
+      // +15: realtime transcription provider, registry, and WebSocket session exports.
+      4323,
       env,
     ),
     publicFunctionExports: readPluginSdkSurfaceBudgetEnv(
@@ -333,7 +335,8 @@ export function readPluginSdkSurfaceBudgets(env: NodeJS.ProcessEnv = process.env
       // +1: narrow channel agent-run terminal reader.
       // +5: narrow string, record, and error coercion helpers.
       // +1: normalized Gateway public origin resolver for plugin-generated links.
-      2572,
+      // +5: realtime transcription registry and WebSocket session helpers.
+      2577,
       env,
     ),
     publicDeprecatedExports: readPluginSdkSurfaceBudgetEnv(
