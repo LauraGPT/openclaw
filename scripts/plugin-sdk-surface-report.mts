@@ -267,8 +267,8 @@ export function readPluginSdkSurfaceBudgets(env: NodeJS.ProcessEnv = process.env
       // +2: narrow channel agent-run terminal reader and outcome contract.
       // +5: narrow string, record, and error coercion helpers.
       // +1: normalized Gateway public origin resolver for plugin-generated links.
-      // +15: realtime transcription provider, registry, and WebSocket session exports.
-      4323,
+      // +11: realtime transcription provider types and WebSocket session exports.
+      4319,
       env,
     ),
     publicFunctionExports: readPluginSdkSurfaceBudgetEnv(
@@ -335,8 +335,8 @@ export function readPluginSdkSurfaceBudgets(env: NodeJS.ProcessEnv = process.env
       // +1: narrow channel agent-run terminal reader.
       // +5: narrow string, record, and error coercion helpers.
       // +1: normalized Gateway public origin resolver for plugin-generated links.
-      // +5: realtime transcription registry and WebSocket session helpers.
-      2577,
+      // +1: realtime transcription WebSocket session helper.
+      2573,
       env,
     ),
     publicDeprecatedExports: readPluginSdkSurfaceBudgetEnv(

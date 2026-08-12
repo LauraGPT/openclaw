@@ -129,6 +129,7 @@
   "qa-lab",
   "qa-runner-runtime",
   "qa-runtime",
+  "realtime-transcription-runtime",
   "realtime-bootstrap-context",
   "realtime-voice",
   "realtime-voice-activation",

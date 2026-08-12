@@ -762,6 +762,23 @@ describe("plugin-sdk package contract guardrails", () => {
     });
   });
 
+  it("keeps realtime transcription registry helpers on a private runtime subpath", () => {
+    const publicSource = fs.readFileSync(
+      resolve(REPO_ROOT, "src/plugin-sdk/realtime-transcription.ts"),
+      "utf8",
+    );
+    const registryExports = [
+      "canonicalizeRealtimeTranscriptionProviderId",
+      "getRealtimeTranscriptionProvider",
+      "listRealtimeTranscriptionProviders",
+      "normalizeRealtimeTranscriptionProviderId",
+    ];
+
+    expect(registryExports.filter((name) => publicSource.includes(name))).toStrictEqual([]);
+    expect(privateLocalOnlyPluginSdkEntrypoints).toContain("realtime-transcription-runtime");
+    expect(publicPluginSdkEntrypoints).not.toContain("realtime-transcription-runtime");
+  });
+
   it("keeps deprecated public SDK subpaths unused by extension production code", () => {
     const publicEntrypoints = new Set(publicPluginSdkEntrypoints);
     const unknownDeprecated = deprecatedPublicPluginSdkEntrypoints.filter(
