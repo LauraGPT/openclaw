@@ -272,7 +272,9 @@ export function readPluginSdkSurfaceBudgets(env: NodeJS.ProcessEnv = process.env
       // +5: narrow string, record, and error coercion helpers.
       // +1: normalized Gateway public origin resolver for plugin-generated links.
       // +11: realtime transcription provider types and WebSocket session exports.
-      4319,
+      // -2: retire the dead progress-draft render reader; it counted twice via
+      // channel-outbound and channel-message's wildcard re-export of it.
+      4317,
       env,
     ),
     publicFunctionExports: readPluginSdkSurfaceBudgetEnv(
@@ -340,7 +342,9 @@ export function readPluginSdkSurfaceBudgets(env: NodeJS.ProcessEnv = process.env
       // +5: narrow string, record, and error coercion helpers.
       // +1: normalized Gateway public origin resolver for plugin-generated links.
       // +1: realtime transcription WebSocket session helper.
-      2573,
+      // -2: retire the dead progress-draft render reader; it counted twice via
+      // channel-outbound and channel-message's wildcard re-export of it.
+      2571,
       env,
     ),
     publicDeprecatedExports: readPluginSdkSurfaceBudgetEnv(
