@@ -2665,7 +2665,7 @@ NODE
     const nodeMaxParallel =
       workflow.jobs["checks-node-core-test-nondist-shard"].strategy["max-parallel"];
     expect(nodeMaxParallel).toBe(
-      "${{ (vars.OPENCLAW_CI_RUNNER_BACKEND == 'github' || vars.OPENCLAW_CI_RUNNER_BACKEND == 'hybrid') && 64 || 28 }}",
+      "${{ (vars.OPENCLAW_CI_RUNNER_BACKEND == 'github' || vars.OPENCLAW_CI_RUNNER_BACKEND == 'hybrid') && 96 || 28 }}",
     );
     expect(
       evaluateWorkflowExpression(nodeMaxParallel, {
@@ -2682,7 +2682,7 @@ NODE
         runnerBackend: "github",
         runAttempt: 1,
       }),
-    ).toBe(64);
+    ).toBe(96);
     expect(
       evaluateWorkflowExpression(nodeMaxParallel, {
         eventName: "push",
@@ -2690,7 +2690,7 @@ NODE
         runnerBackend: "hybrid",
         runAttempt: 1,
       }),
-    ).toBe(64);
+    ).toBe(96);
     expect(workflow.jobs["checks-fast-plugin-contracts-shard"].strategy["max-parallel"]).toBe(12);
     expect(workflow.jobs["checks-fast-channel-contracts-shard"].strategy["max-parallel"]).toBe(12);
     expect(workflow.jobs["check-shard"].strategy["max-parallel"]).toBe(12);
@@ -3036,6 +3036,7 @@ NODE
       ...expectedHostedRunners,
       android: "blacksmith-8vcpu-ubuntu-2404",
       "build-artifacts": "blacksmith-32vcpu-ubuntu-2404",
+      "checks-node-core-test-nondist-shard": "blacksmith-32vcpu-ubuntu-2404",
       "checks-ui-e2e": "blacksmith-8vcpu-ubuntu-2404",
       "qa-smoke-ci-profile": "blacksmith-16vcpu-ubuntu-2404",
       "sqlite-session-lifecycle": "blacksmith-8vcpu-ubuntu-2404",
@@ -3118,6 +3119,16 @@ NODE
         },
         runner: "blacksmith-32vcpu-ubuntu-2404",
       },
+      {
+        jobName: "checks-node-core-test-nondist-shard",
+        matrix: { runner: "blacksmith-4vcpu-ubuntu-2404" },
+        runner: "blacksmith-4vcpu-ubuntu-2404",
+      },
+      {
+        jobName: "checks-node-core-test-nondist-shard",
+        matrix: { runner: "blacksmith-8vcpu-ubuntu-2404" },
+        runner: "blacksmith-8vcpu-ubuntu-2404",
+      },
     ] as const;
     for (const { jobName, matrix, runner } of widenedHybridMatrixRows) {
       const expression = jobs[jobName]?.["runs-on"];
@@ -3154,6 +3165,15 @@ NODE
           runnerBackend: "hybrid",
         }),
         `${jobName}: fork pull request`,
+      ).toBe("ubuntu-24.04");
+      expect(
+        evaluateWorkflowExpression(expression, {
+          ...canonicalPullRequest,
+          eventName: "workflow_dispatch",
+          matrix,
+          runnerBackend: "hybrid",
+        }),
+        `${jobName}: workflow dispatch`,
       ).toBe("ubuntu-24.04");
     }
 
@@ -3972,6 +3992,8 @@ server.listen(0, "127.0.0.1", () => writeFileSync(readyPath, String(server.addre
     ).toBe(false);
     expect(writerStep.uses).toBe("actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae");
     expect(writerStep.if).toContain("inputs.save-vitest-fs-cache == 'true'");
+    expect(writerStep.if).toContain("runner.os != 'Windows'");
+    expect(writerStep.if).not.toMatch(/runner\.(?:environment|labels|name)/u);
     expect(writerStep.with.key).toContain("vitest-fs-v3-protected-");
     expect(writerStep.with.key).toContain("github.run_id");
     expect(writerStep.with.key).toContain("github.run_attempt");
@@ -3984,6 +4006,8 @@ server.listen(0, "127.0.0.1", () => writeFileSync(readyPath, String(server.addre
     expect(readerStep.uses).toBe(CACHE_V5);
     expect(readerStep.if).toContain("inputs.restore-test-caches == 'true'");
     expect(readerStep.if).toContain("inputs.save-vitest-fs-cache != 'true'");
+    expect(readerStep.if).toContain("runner.os != 'Windows'");
+    expect(readerStep.if).not.toMatch(/runner\.(?:environment|labels|name)/u);
     expect(readerStep.with["restore-keys"]).toBe(writerStep.with["restore-keys"]);
     expect(readerStep.with.key).toContain("!**/node_modules/**");
     expect(readerStep.with.key).toContain("src/state/*.sql");
@@ -5195,10 +5219,13 @@ server.listen(0, "127.0.0.1", () => writeFileSync(readyPath, String(server.addre
     expect(testStep.run).toContain(
       "swift_test_args=(--package-path apps/macos --enable-code-coverage)",
     );
-    expect(testStep.run).toContain('if [[ "$SWIFT_TEST_EXECUTION" == "parallel" ]]');
-    expect(testStep.run).toContain("swift_test_args+=(--parallel)");
-    expect(testStep.run).toContain("else\n  swift_test_args+=(--no-parallel)");
-    expect(testStep.run).toContain('swift test "${swift_test_args[@]}"');
+    expect(testStep.run).toContain('attempt_args=("${swift_test_args[@]}")');
+    expect(testStep.run).toContain(
+      'if [[ "$SWIFT_TEST_EXECUTION" == "parallel" && "$attempt" -eq 1 ]]',
+    );
+    expect(testStep.run).toContain("attempt_args+=(--parallel)");
+    expect(testStep.run).toContain("else\n    attempt_args+=(--no-parallel)");
+    expect(testStep.run).toContain('swift test "${attempt_args[@]}"');
     expect(testStep.run).not.toContain(
       "swift test --package-path apps/macos --parallel --enable-code-coverage",
     );
@@ -5561,7 +5588,9 @@ printf '%s\n' "\${CURL_SUCCESS_IP:-203.0.113.7}"
     expect(checkShardRun).toContain('if [ "$RUNNER_BACKEND" = "github" ]; then');
     expect(checkShardRun).toContain("lint_args=(--only=extensions --only=scripts --threads=1)");
     expect(checkShardRun).toContain('elif [ "$(nproc)" -lt 8 ]; then');
-    expect(checkShardRun).toContain("lint_args=(--split-core --threads=1)");
+    expect(checkShardRun).toContain("lint_args=(--threads=1)");
+    expect(checkShardRun).not.toContain("lint_args=(--split-core --threads=1)");
+    expect(checkShardRun.match(/export GOMAXPROCS=2/gu)).toHaveLength(2);
     expect(checkShardRun).toContain('pnpm lint "${lint_args[@]}"');
     expect(checkShardRun).toContain(
       'node --import tsx scripts/run-oxlint-shards.mts "${lint_args[@]}"',
@@ -5573,6 +5602,10 @@ printf '%s\n' "\${CURL_SUCCESS_IP:-203.0.113.7}"
       "max-parallel": 5,
       matrix: { stripe: [1, 2, 3, 4, 5] },
     });
+    expect(
+      hostedCoreLint.steps.find((step: WorkflowStep) => step.name === "Run hosted core lint stripe")
+        .env.GOMAXPROCS,
+    ).toBe("2");
     expect(
       hostedCoreLint.steps.find((step: WorkflowStep) => step.name === "Run hosted core lint stripe")
         .run,
@@ -5681,7 +5714,7 @@ printf '%s\n' "\${CURL_SUCCESS_IP:-203.0.113.7}"
       'if [[ "${RATCHET_RELEASE_MERGE_TREE:-}" == "true" ]]; then',
     );
     expect(checksFastRun.run).toContain(
-      "node --import tsx scripts/run-oxlint-shards.mts --only=core --only=extensions --split-core --threads=1",
+      "node --import tsx scripts/run-oxlint-shards.mts --only=core --only=extensions --threads=1",
     );
     expect(checksFastRun.run).not.toContain(
       "node scripts/run-oxlint.mjs src ui/src packages extensions",
@@ -6461,12 +6494,31 @@ printf '%s\n' "\${CURL_SUCCESS_IP:-203.0.113.7}"
     );
     expect(scenario.if).toBe("matrix.task == 'control-ui'");
     expect(scenario.env).toEqual({
+      OPENCLAW_UI_E2E_DIAGNOSTIC_DIR:
+        ".artifacts/control-ui-e2e-timeouts/shard-${{ matrix.shard }}-attempt-${{ github.run_attempt }}",
       SHARD_INDEX: "${{ matrix.shard }}",
       VITEST_SHARD_COUNT: "${{ matrix.vitest_shard_count }}",
     });
     expect(scenario.run).toBe(
       'node scripts/run-vitest.mjs run --config test/vitest/vitest.ui-e2e.config.ts --configLoader runner --shard "$SHARD_INDEX/$VITEST_SHARD_COUNT"',
     );
+    const timeoutDiagnostics = expectDefined(
+      uiE2e.steps.find(
+        (step: WorkflowStep) => step.name === "Upload Control UI E2E timeout diagnostics",
+      ),
+      "Control UI E2E timeout diagnostic upload",
+    );
+    expect(timeoutDiagnostics).toEqual({
+      name: "Upload Control UI E2E timeout diagnostics",
+      if: "failure() && matrix.task == 'control-ui'",
+      uses: UPLOAD_ARTIFACT_V7,
+      with: {
+        name: "control-ui-e2e-timeout-${{ matrix.shard }}-${{ github.run_attempt }}",
+        path: ".artifacts/control-ui-e2e-timeouts/shard-${{ matrix.shard }}-attempt-${{ github.run_attempt }}",
+        "if-no-files-found": "ignore",
+        "retention-days": 7,
+      },
+    });
     const browserExtension = expectDefined(
       uiE2e.steps.find(
         (step: WorkflowStep) => step.name === "Test browser extension bootstrap end-to-end",

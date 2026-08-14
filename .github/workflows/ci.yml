@@ -1670,6 +1670,7 @@ jobs:
       - name: Test Control UI end-to-end
         if: matrix.task == 'control-ui'
         env:
+          OPENCLAW_UI_E2E_DIAGNOSTIC_DIR: .artifacts/control-ui-e2e-timeouts/shard-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
           SHARD_INDEX: ${{ matrix.shard }}
           VITEST_SHARD_COUNT: ${{ matrix.vitest_shard_count }}
         run: >-
@@ -1677,6 +1678,15 @@ jobs:
           --config test/vitest/vitest.ui-e2e.config.ts
           --configLoader runner
           --shard "$SHARD_INDEX/$VITEST_SHARD_COUNT"
+
+      - name: Upload Control UI E2E timeout diagnostics
+        if: failure() && matrix.task == 'control-ui'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: control-ui-e2e-timeout-${{ matrix.shard }}-${{ github.run_attempt }}
+          path: .artifacts/control-ui-e2e-timeouts/shard-${{ matrix.shard }}-attempt-${{ github.run_attempt }}
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Test browser extension bootstrap end-to-end
         if: matrix.task == 'browser-extension'
@@ -1890,7 +1900,7 @@ jobs:
               fi
               pnpm check:max-lines-ratchet --base "$base_ref"
               if [[ "${RATCHET_RELEASE_MERGE_TREE:-}" == "true" ]]; then
-                node --import tsx scripts/run-oxlint-shards.mts --only=core --only=extensions --split-core --threads=1
+                node --import tsx scripts/run-oxlint-shards.mts --only=core --only=extensions --threads=1
               fi
               ;;
             bun-launcher)
@@ -2207,13 +2217,13 @@ jobs:
     name: ${{ matrix.check_name }}
     needs: [preflight]
     if: needs.preflight.outputs.run_checks_node_core_nondist == 'true'
-    runs-on: ${{ (vars.OPENCLAW_CI_RUNNER_BACKEND == 'github' || vars.OPENCLAW_CI_RUNNER_BACKEND == 'hybrid') && 'ubuntu-24.04' || github.event_name == 'workflow_dispatch' && 'ubuntu-24.04' || (github.repository == 'openclaw/openclaw' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'openclaw/openclaw') && (matrix.runner || 'blacksmith-4vcpu-ubuntu-2404') || 'ubuntu-24.04') }}
+    runs-on: ${{ vars.OPENCLAW_CI_RUNNER_BACKEND == 'github' && 'ubuntu-24.04' || (vars.OPENCLAW_CI_RUNNER_BACKEND == 'hybrid' && github.run_attempt > 1) && 'ubuntu-24.04' || github.event_name == 'workflow_dispatch' && 'ubuntu-24.04' || (github.repository == 'openclaw/openclaw' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'openclaw/openclaw') && (matrix.runner || 'blacksmith-4vcpu-ubuntu-2404') || 'ubuntu-24.04') }}
     timeout-minutes: ${{ matrix.timeout_minutes || 60 }}
     strategy:
       fail-fast: false
       # Canonical main admits only one complete run at a time, so widen this
       # matrix within the current runner-registration budget.
-      max-parallel: ${{ (vars.OPENCLAW_CI_RUNNER_BACKEND == 'github' || vars.OPENCLAW_CI_RUNNER_BACKEND == 'hybrid') && 64 || 28 }}
+      max-parallel: ${{ (vars.OPENCLAW_CI_RUNNER_BACKEND == 'github' || vars.OPENCLAW_CI_RUNNER_BACKEND == 'hybrid') && 96 || 28 }}
       matrix: ${{ fromJson(needs.preflight.outputs.checks_node_core_nondist_matrix) }}
     steps:
       - *linux_node_checkout_step
@@ -2222,15 +2232,15 @@ jobs:
         with:
           node-version: "${{ matrix.node_version || '24.x' }}"
           install-bun: "false"
-          # Only the preflight writer saves an archive. Same-repo Blacksmith
-          # shards restore it; hosted and non-Node-24 paths use the pnpm store.
+          # Only the preflight writer saves an exact dependency archive.
+          # All-Blacksmith shards restore it; github/hybrid use the pnpm store.
           dependency-cache: ${{ (matrix.node_version == null || matrix.node_version == '24.x') && vars.OPENCLAW_CI_RUNNER_BACKEND != 'github' && vars.OPENCLAW_CI_RUNNER_BACKEND != 'hybrid' && github.event_name != 'workflow_dispatch' && github.repository == 'openclaw/openclaw' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'openclaw/openclaw') && 'true' || 'false' }}
           use-actions-cache: ${{ (matrix.node_version == null || matrix.node_version == '24.x') && vars.OPENCLAW_CI_RUNNER_BACKEND != 'github' && vars.OPENCLAW_CI_RUNNER_BACKEND != 'hybrid' && github.event_name != 'workflow_dispatch' && github.repository == 'openclaw/openclaw' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'openclaw/openclaw') && 'false' || 'true' }}
           vitest-fs-cache: "true"
           node-compile-cache: "true"
           node-compile-cache-scope: "test"
-          # Hosted mode elects one in-run writer so the transform cache can
-          # recover without waiting for the scheduled or manual warmer.
+          # The github/hybrid planner profile elects one in-run writer so the
+          # transform cache can recover without waiting for the cache warmer.
           save-vitest-fs-cache: ${{ (vars.OPENCLAW_CI_RUNNER_BACKEND == 'github' || vars.OPENCLAW_CI_RUNNER_BACKEND == 'hybrid') && matrix.save_vitest_fs_cache && 'true' || 'false' }}
 
       - name: Setup Go for docs i18n
@@ -2501,15 +2511,16 @@ jobs:
               # i18n-tooling diff must run it. oxlint always runs.
               lint_args=(--threads=8)
               if [ "$RUNNER_BACKEND" = "github" ]; then
-                # Three dedicated hosted jobs own the split core stripes. Keep
+                # Five dedicated hosted jobs own the aggregated core Programs. Keep
                 # extension preparation, optional UI checks, and formatting in
-                # this fourth lane so each 4-core runner stays below ~6m.
+                # this sixth lane so each 4-core runner stays below ~6m.
                 lint_args=(--only=extensions --only=scripts --threads=1)
+                export GOMAXPROCS=2
               elif [ "$(nproc)" -lt 8 ]; then
-                # Fork PRs run on 4-core hosted runners with 16GB. Bound both
-                # the core process size and its threads so type-aware oxlint
-                # does not intermittently lose the runner under memory pressure.
-                lint_args=(--split-core --threads=1)
+                # Fork PRs build each semantic Program once. Bound both oxlint
+                # and its Go helper within the 4-core/16GB hosted runner.
+                lint_args=(--threads=1)
+                export GOMAXPROCS=2
               fi
               if [ "$RUN_CONTROL_UI_I18N" = "true" ] || [ "$RUN_UI_TESTS" = "true" ]; then
                 pnpm lint "${lint_args[@]}"
@@ -2613,8 +2624,8 @@ jobs:
               ;;
           esac
 
-  # The github/hybrid planner profile splits the serial core oxlint path across
-  # five deterministic hosted jobs. All-Blacksmith mode keeps one lint job.
+  # The github/hybrid planner profile aggregates core targets into five Programs
+  # across five hosted jobs. All-Blacksmith mode keeps one lint job.
   check-lint-hosted-core-shard:
     permissions:
       contents: read
@@ -2639,6 +2650,7 @@ jobs:
 
       - name: Run hosted core lint stripe
         env:
+          GOMAXPROCS: "2"
           OPENCLAW_LOCAL_CHECK: "0"
         run: >-
           node --import tsx scripts/run-oxlint-shards.mts
@@ -3511,15 +3523,16 @@ jobs:
         run: |
           set -euo pipefail
           swift_test_args=(--package-path apps/macos --enable-code-coverage)
-          # Hosted release and retry runs have shown test-process contention;
-          # keep the faster first-attempt Blacksmith path parallel.
-          if [[ "$SWIFT_TEST_EXECUTION" == "parallel" ]]; then
-            swift_test_args+=(--parallel)
-          else
-            swift_test_args+=(--no-parallel)
-          fi
           for attempt in 1 2 3; do
-            if swift test "${swift_test_args[@]}"; then
+            attempt_args=("${swift_test_args[@]}")
+            # Keep the fast first-attempt Blacksmith path parallel, but make
+            # in-job retries serial after any contention-driven failure.
+            if [[ "$SWIFT_TEST_EXECUTION" == "parallel" && "$attempt" -eq 1 ]]; then
+              attempt_args+=(--parallel)
+            else
+              attempt_args+=(--no-parallel)
+            fi
+            if swift test "${attempt_args[@]}"; then
               exit 0
             fi
             echo "swift test failed (attempt $attempt/3). Retrying…"

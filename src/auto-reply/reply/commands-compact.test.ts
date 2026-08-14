@@ -441,6 +441,44 @@ describe("handleCompactCommand", () => {
     );
   });
 
+  it("keeps the selected agent when compacting an ambiguous global session", async () => {
+    vi.mocked(compactEmbeddedAgentSession).mockResolvedValueOnce({
+      ok: true,
+      compacted: false,
+    });
+    resolveSessionAgentIdMock.mockReturnValue("marie-clawndo");
+    const cfg = {
+      agents: {
+        entries: {
+          main: {},
+          "marie-clawndo": {},
+        },
+      },
+    } as OpenClawConfig;
+
+    await handleCompactCommand(
+      {
+        ...buildCompactParams("/compact", cfg),
+        agentId: "marie-clawndo",
+        sessionKey: "global",
+        sessionEntry: {
+          sessionId: "session-1",
+          updatedAt: Date.now(),
+        },
+      } as HandleCommandsParams,
+      true,
+    );
+
+    expect(resolveSessionAgentIdMock).toHaveBeenCalledWith({
+      sessionKey: "global",
+      config: cfg,
+      agentId: "marie-clawndo",
+    });
+    expect(requireCompactEmbeddedAgentSessionCall().sessionTarget).toMatchObject({
+      agentId: "marie-clawndo",
+    });
+  });
+
   it("uses the resolved command store for compaction", async () => {
     vi.mocked(compactEmbeddedAgentSession).mockResolvedValueOnce({
       ok: true,
@@ -585,11 +623,57 @@ describe("handleCompactCommand", () => {
     });
   });
 
+  it("targets the persisted native CLI session for manual compaction", async () => {
+    cliBackendsTesting.setDepsForTest({
+      resolveRuntimeCliBackends: () =>
+        [
+          {
+            id: "claude-cli",
+            modelProvider: "anthropic",
+            config: { command: "claude" },
+            bundleMcp: false,
+          },
+        ] as never,
+    });
+    vi.mocked(compactEmbeddedAgentSession).mockResolvedValueOnce({
+      ok: true,
+      compacted: true,
+    });
+
+    try {
+      await handleCompactCommand(
+        {
+          ...buildCompactParams("/compact", {
+            commands: { text: true },
+            channels: { whatsapp: { allowFrom: ["*"] } },
+          } as OpenClawConfig),
+          provider: "anthropic",
+          sessionEntry: {
+            sessionId: "cli-session",
+            updatedAt: Date.now(),
+            cliSessionBindings: {
+              "claude-cli": { sessionId: "native-claude-session" },
+            },
+          },
+        } as HandleCommandsParams,
+        true,
+      );
+
+      expect(requireCompactEmbeddedAgentSessionCall()).toMatchObject({
+        agentHarnessId: "claude-cli",
+        cliSessionId: "native-claude-session",
+        trigger: "manual",
+      });
+    } finally {
+      cliBackendsTesting.resetDepsForTest();
+    }
+  });
+
   it.each([
     { provider: "anthropic", harness: "claude-cli", override: true, expectedRuntime: "claude-cli" },
     { provider: "anthropic", harness: "claude-cli", expectedRuntime: "claude-cli" },
     { provider: "openai", harness: "claude-cli", override: true, expectedRuntime: undefined },
-    { provider: "openai", harness: "claude-cli", expectedRuntime: "claude-cli" },
+    { provider: "openai", harness: "claude-cli", expectedRuntime: undefined },
     { provider: "anthropic", harness: "codex", override: true, expectedRuntime: undefined },
     { provider: "openai", harness: "codex", expectedRuntime: "codex" },
     { provider: "github-copilot", harness: "copilot", expectedRuntime: "copilot" },
@@ -603,6 +687,12 @@ describe("handleCompactCommand", () => {
               id: "claude-cli",
               modelProvider: "anthropic",
               config: { command: "claude" },
+              bundleMcp: false,
+            },
+            {
+              id: "copilot",
+              modelProvider: "github-copilot",
+              config: { command: "copilot" },
               bundleMcp: false,
             },
           ] as never,
@@ -709,6 +799,33 @@ describe("handleCompactCommand", () => {
 
     expect(vi.mocked(incrementCompactionCount)).not.toHaveBeenCalled();
     expect(result?.reply?.text).toContain("Compaction skipped");
+  });
+
+  it("reports server-side compaction with before and after tokens", async () => {
+    vi.mocked(compactEmbeddedAgentSession).mockResolvedValueOnce({
+      ok: true,
+      compacted: true,
+      compactionKind: "server-endpoint",
+      result: {
+        kind: "server-endpoint",
+        tokensBefore: 8_614,
+        tokensAfter: 736,
+      },
+    });
+
+    const result = await handleCompactCommand(
+      {
+        ...buildCompactParams("/compact", {
+          commands: { text: true },
+          channels: { whatsapp: { allowFrom: ["*"] } },
+        } as OpenClawConfig),
+        sessionEntry: { sessionId: "server-session", updatedAt: Date.now() },
+      } as HandleCommandsParams,
+      true,
+    );
+
+    expect(result?.reply?.text).toContain("Server-side compaction (8614 → 736)");
+    expect(requireIncrementCompactionCountCall().compactionKind).toBe("server-endpoint");
   });
 
   it.each([
