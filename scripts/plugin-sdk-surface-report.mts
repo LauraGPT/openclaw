@@ -190,7 +190,8 @@ export function readPluginSdkSurfaceBudgets(env: NodeJS.ProcessEnv = process.env
       //     (realtime-voice-activation is private-local and not counted here).
       // +1: registry-bound plugin command planning and exact selected execution.
       // +1: typed realtime transcription provider and WebSocket session contract.
-      145,
+      // +1: canonical Computer Use wire contract and node-host provider seam.
+      146,
       env,
     ),
     publicExports: readPluginSdkSurfaceBudgetEnv(
@@ -274,7 +275,9 @@ export function readPluginSdkSurfaceBudgets(env: NodeJS.ProcessEnv = process.env
       // +11: realtime transcription provider types and WebSocket session exports.
       // -2: retire the dead progress-draft render reader; it counted twice via
       // channel-outbound and channel-message's wildcard re-export of it.
-      4317,
+      // +11: Computer Use schemas/types plus parsers, compiler, and provider registration.
+      // +6: Computer Use v2 action, result, and capability contracts.
+      4334,
       env,
     ),
     publicFunctionExports: readPluginSdkSurfaceBudgetEnv(
@@ -344,7 +347,8 @@ export function readPluginSdkSurfaceBudgets(env: NodeJS.ProcessEnv = process.env
       // +1: realtime transcription WebSocket session helper.
       // -2: retire the dead progress-draft render reader; it counted twice via
       // channel-outbound and channel-message's wildcard re-export of it.
-      2571,
+      // +4: Computer Use wire parsers, validator compiler, and provider registration.
+      2575,
       env,
     ),
     publicDeprecatedExports: readPluginSdkSurfaceBudgetEnv(

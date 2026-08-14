@@ -11,7 +11,6 @@ import type {
   NodeWorkerSupervisorTransport,
 } from "../node-registry-private.js";
 import { createNodeWorkerLaunchAdapter } from "./node-launch-adapter.js";
-import type { WorkerEnvironmentServiceContract } from "./service-contract.js";
 
 export const DEVICE_WORKER_PROVIDER_ID = "device";
 
@@ -23,14 +22,14 @@ type DeviceWorkerAvailability = (deviceId: string) => Promise<boolean>;
 const DEVICE_WORKER_AVAILABILITY = new WeakMap<object, DeviceWorkerAvailability>();
 
 export function bindDeviceWorkerAvailability(
-  service: WorkerEnvironmentServiceContract,
+  service: object,
   isAvailable: DeviceWorkerAvailability,
 ): void {
   DEVICE_WORKER_AVAILABILITY.set(service, isAvailable);
 }
 
 export async function isDeviceWorkerAvailable(
-  service: WorkerEnvironmentServiceContract | undefined,
+  service: object | undefined,
   deviceId: string,
 ): Promise<boolean> {
   const isAvailable = service ? DEVICE_WORKER_AVAILABILITY.get(service) : undefined;
@@ -106,6 +105,7 @@ export function createDeviceWorkerRuntime(options: DeviceWorkerRuntimeOptions) {
     provider,
     isAvailable,
     launchNodeWorker: launchAdapter.launch,
+    getNodeTransport: () => nodeTransport,
     // Provisioning reads the node-advertised local-install build through the
     // runtime so node lookups keep one owner; absent means not connected or
     // not session-capable, and the caller fails provisioning closed.

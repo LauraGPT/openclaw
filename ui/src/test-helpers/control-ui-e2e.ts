@@ -266,6 +266,8 @@ export type ControlUiMockGatewayScenario = {
   historyMessages?: unknown[];
   /** Static payloads, parameter-matched cases, or call-ordered sequences. */
   methodResponses?: Record<string, unknown>;
+  /** URL prefixes that retain the browser's real WebSocket transport. */
+  webSocketPassthroughPrefixes?: string[];
   /** Replayed in-flight run snapshot served by chat.history and chat.startup. */
   inFlightRun?: {
     runId: string;
@@ -487,19 +489,19 @@ export async function startControlUiE2eServer(
   };
 }
 
-function controlUiE2ePreviewConfigPlugin(): Plugin {
+function controlUiE2ePreviewConfigPlugin(
+  bootstrapConfig: Record<string, unknown> = {
+    basePath: "/",
+    assistantName: "",
+    assistantAvatar: "",
+  },
+): Plugin {
   return {
     name: "control-ui-e2e-preview-config",
     configurePreviewServer(server) {
       server.middlewares.use(CONTROL_UI_BOOTSTRAP_CONFIG_PATH, (_req, res) => {
         res.setHeader("Content-Type", "application/json");
-        res.end(
-          JSON.stringify({
-            basePath: "/",
-            assistantName: "",
-            assistantAvatar: "",
-          }),
-        );
+        res.end(JSON.stringify(bootstrapConfig));
       });
     },
   };
@@ -571,7 +573,10 @@ async function runProductionControlUiBuild(outDir: string): Promise<void> {
   });
 }
 
-async function startBuiltControlUiE2eServer(outDir: string): Promise<ControlUiE2eServer> {
+async function startBuiltControlUiE2eServer(
+  outDir: string,
+  bootstrapConfig?: Record<string, unknown>,
+): Promise<ControlUiE2eServer> {
   const [{ preview }, { default: controlUiViteConfig }] = await Promise.all([
     import("vite"),
     import("../../vite.config.ts"),
@@ -580,7 +585,7 @@ async function startBuiltControlUiE2eServer(outDir: string): Promise<ControlUiE2
   const sharedConfig = createBundledControlUiE2eConfig(controlUiViteConfig, outDir);
   const server = await preview({
     ...sharedConfig,
-    plugins: [...(sharedConfig.plugins ?? []), controlUiE2ePreviewConfigPlugin()],
+    plugins: [...(sharedConfig.plugins ?? []), controlUiE2ePreviewConfigPlugin(bootstrapConfig)],
     preview: {
       host: "127.0.0.1",
       port,
@@ -610,9 +615,10 @@ export async function startBundledControlUiE2eServer(outDir: string): Promise<Co
 export async function startProductionControlUiE2eServer(
   outDir: string,
   buildId: string,
+  bootstrapConfig?: Record<string, unknown>,
 ): Promise<ControlUiE2eServer> {
   await buildProductionControlUiE2e(outDir, buildId);
-  return startBuiltControlUiE2eServer(outDir);
+  return startBuiltControlUiE2eServer(outDir, bootstrapConfig);
 }
 
 async function resolveAvailableLoopbackPort(): Promise<number> {
@@ -686,6 +692,7 @@ function normalizeScenario(
     omitFeatureMethods: scenario.omitFeatureMethods ?? false,
     historyMessages: scenario.historyMessages ?? [],
     methodResponses: scenario.methodResponses ?? {},
+    webSocketPassthroughPrefixes: scenario.webSocketPassthroughPrefixes ?? [],
     inFlightRun: scenario.inFlightRun ?? null,
     presenceUsers: scenario.presenceUsers ?? [],
     models: scenario.models ?? [{ id: "gpt-5.5", name: "gpt-5.5", provider: "openai" }],
@@ -742,6 +749,7 @@ function installControlUiMockGateway(
   },
   parseJson5: (raw: string) => unknown,
 ) {
+  const NativeWebSocket = window.WebSocket;
   type BrowserRequest = { id: string; method: string; params?: unknown };
   type BrowserFrame = {
     id?: unknown;
@@ -1962,7 +1970,23 @@ function installControlUiMockGateway(
   };
 
   (window as unknown as WindowWithGateway).openclawControlUiE2eGateway = exposed;
-  window.WebSocket = MockWebSocket as unknown as typeof WebSocket;
+  const RoutedWebSocket = function (url: string | URL, protocols?: string | string[]) {
+    const resolvedUrl = String(url);
+    if (scenario.webSocketPassthroughPrefixes.some((prefix) => resolvedUrl.startsWith(prefix))) {
+      return protocols === undefined
+        ? new NativeWebSocket(resolvedUrl)
+        : new NativeWebSocket(resolvedUrl, protocols);
+    }
+    return new MockWebSocket(resolvedUrl);
+  };
+  RoutedWebSocket.prototype = MockWebSocket.prototype;
+  Object.assign(RoutedWebSocket, {
+    CLOSED: MockWebSocket.CLOSED,
+    CLOSING: MockWebSocket.CLOSING,
+    CONNECTING: MockWebSocket.CONNECTING,
+    OPEN: MockWebSocket.OPEN,
+  });
+  window.WebSocket = RoutedWebSocket as unknown as typeof WebSocket;
   window.addEventListener("pagehide", () => {
     sessionMessageSubscriptions.clear();
     stopRepeatingSessionEvents();
