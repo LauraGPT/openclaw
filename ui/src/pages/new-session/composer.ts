@@ -33,6 +33,7 @@ type NewSessionComposerOptions = {
   readSignal: AbortSignal;
   requiresModifier: boolean;
   submitDisabledReason?: string;
+  blockedSubmitNotice?: string;
   terminalAction?: {
     canStart: boolean;
     disabledReason?: string;
@@ -43,7 +44,6 @@ type NewSessionComposerOptions = {
   messageLocked?: boolean;
   visibility?: NewSessionVisibility;
   draftAvailable?: boolean;
-  incognitoDisabledReason?: string;
   onAttachmentsChange: (attachments: ChatAttachment[]) => void;
   onPendingReadsChange: (delta: 1 | -1) => void;
   onInput: (message: string) => void;
@@ -144,18 +144,16 @@ export class NewSessionComposerTextareaController {
   }
 }
 
-/** Mutually exclusive visibility pills: selecting one clears the other, re-click returns to normal. */
+/** Draft visibility pill: selecting it clears incognito, re-click returns to normal. */
 function renderVisibilityPill(params: {
   mode: Exclude<NewSessionVisibility, "normal">;
   icon: unknown;
   label: string;
   description: string;
-  disabledReason?: string;
   options: NewSessionComposerOptions;
 }) {
   const active = params.options.visibility === params.mode;
-  const disabled =
-    params.options.submitting || params.options.messageLocked || Boolean(params.disabledReason);
+  const disabled = params.options.submitting || params.options.messageLocked;
   return html`
     <button
       type="button"
@@ -163,7 +161,7 @@ function renderVisibilityPill(params: {
       role="switch"
       aria-checked=${String(active)}
       ?disabled=${disabled}
-      title=${params.disabledReason ?? params.description}
+      title=${params.description}
       @click=${() => params.options.onVisibilityChange?.(active ? "normal" : params.mode)}
     >
       <span aria-hidden="true">${params.icon}</span>${params.label}
@@ -181,17 +179,16 @@ export function renderDraftError(message: string) {
 }
 
 function handleComposerKeydown(event: KeyboardEvent, options: NewSessionComposerOptions) {
-  if (
-    !options.canSubmit ||
-    options.submitting ||
-    event.key !== "Enter" ||
-    event.shiftKey ||
-    event.isComposing ||
-    event.keyCode === 229
-  ) {
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing || event.keyCode === 229) {
     return;
   }
-  if (!options.requiresModifier || event.metaKey || event.ctrlKey) {
+  if (options.requiresModifier && !event.metaKey && !event.ctrlKey) {
+    return;
+  }
+  // A reasoned gate still consumes the press: the submission flow records the
+  // attempt and surfaces the reason instead of silently inserting a newline.
+  // Only silent gates (busy button, empty draft) keep Enter native.
+  if (options.canSubmit || options.submitDisabledReason !== undefined) {
     event.preventDefault();
     options.onSubmit();
   }
@@ -266,16 +263,13 @@ function renderNewSessionComposer(options: NewSessionComposerOptions) {
                   options,
                 })
               : nothing}
-            ${renderVisibilityPill({
-              mode: "incognito",
-              icon: icons.eyeOff,
-              label: t("newSession.incognito"),
-              description: t("newSession.incognitoDescription"),
-              disabledReason: options.incognitoDisabledReason,
-              options,
-            })}
           </div>
         </div>
+        ${options.blockedSubmitNotice
+          ? html`<div class="new-session-page__blocked-submit" role="status">
+              ${options.blockedSubmitNotice}
+            </div>`
+          : nothing}
         ${options.pendingAttachmentReads > 0
           ? html`<span class="sr-only" role="status">${t("newSession.readingAttachment")}</span>`
           : nothing}
@@ -298,6 +292,7 @@ export function renderNewSessionDraftComposer(options: {
   textareaController: NewSessionComposerTextareaController;
   requiresModifier: boolean;
   submitDisabledReason?: string;
+  blockedSubmitNotice?: string;
   terminalAction?: {
     canStart: boolean;
     disabledReason?: string;
@@ -305,7 +300,6 @@ export function renderNewSessionDraftComposer(options: {
   };
   submitting: boolean;
   messageLocked?: boolean;
-  incognitoDisabledReason?: string;
   onInput: (message: string) => void;
   onOpenImage?: (item: ImageLightboxItem) => void;
   onVisibilityChange?: (visibility: NewSessionVisibility) => void;
@@ -332,11 +326,11 @@ export function renderNewSessionDraftComposer(options: {
     readSignal,
     requiresModifier: options.requiresModifier,
     submitDisabledReason: options.submitDisabledReason,
+    blockedSubmitNotice: options.blockedSubmitNotice,
     terminalAction: options.terminalAction,
     submitting: options.submitting,
     textareaController: options.textareaController,
     messageLocked: options.messageLocked,
-    incognitoDisabledReason: options.incognitoDisabledReason,
     onAttachmentsChange: (attachments) => {
       if (!options.submitting && !options.messageLocked) {
         options.attachmentDraft.replace(attachments);

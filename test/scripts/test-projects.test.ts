@@ -14,7 +14,6 @@ import {
   applyFullExtensionsHeapBudget,
   applyParallelVitestCachePaths,
   buildFullSuiteVitestRunPlans,
-  buildVitestArgs,
   buildVitestRunPlans,
   createVitestRunSpecs,
   findUnmatchedExplicitTestTargets,
@@ -41,8 +40,14 @@ import {
 } from "../vitest/vitest.contracts-shared.ts";
 
 const normalizeRepoPath = toRepoPath;
+const CODEX_TEST_PROCESS_FILE_LIMIT = 40;
 const MATRIX_TEST_PROCESS_FILE_LIMIT = 40;
 const TELEGRAM_TEST_PROCESS_FILE_LIMIT = 1;
+
+function expectedCodexTestProcessCount() {
+  const testFileCount = listExtensionTestFilesForRoots(["extensions/codex"]).length;
+  return Math.max(1, Math.ceil(testFileCount / CODEX_TEST_PROCESS_FILE_LIMIT));
+}
 
 function expectedMatrixTestProcessCount() {
   const testFileCount = listExtensionTestFilesForRoots(["extensions/matrix"]).length;
@@ -55,9 +60,11 @@ function expectedTelegramTestProcessCount() {
 }
 
 function listExpectedFullExtensionRunPlans() {
+  const codexConfig = "test/vitest/vitest.extension-codex.config.ts";
   const matrixConfig = "test/vitest/vitest.extension-matrix.config.ts";
   const telegramConfig = "test/vitest/vitest.extension-telegram.config.ts";
   const boundedPlansByConfig = new Map([
+    [codexConfig, buildVitestRunPlans(["extensions/codex"], process.cwd())],
     [matrixConfig, buildVitestRunPlans(["extensions/matrix"], process.cwd())],
     [telegramConfig, buildVitestRunPlans(["extensions/telegram"], process.cwd())],
   ]);
@@ -1988,6 +1995,20 @@ describe("scripts/test-projects changed-target routing", () => {
     );
   });
 
+  it("routes worker launcher changes through every split owner suite", () => {
+    expectChangedTargets(
+      ["src/gateway/worker-environments/worker-turn-launcher.ts"],
+      [
+        "src/gateway/worker-environments/worker-turn-launcher.test.ts",
+        "src/gateway/worker-environments/worker-turn-launcher-claim-admission.test.ts",
+        "src/gateway/worker-environments/worker-turn-launcher-failure-recovery.test.ts",
+        "src/gateway/worker-environments/worker-turn-launcher-reclaimed-placement.test.ts",
+        "src/gateway/worker-environments/worker-turn-launcher-remote-handoff.test.ts",
+        "src/gateway/worker-environments/worker-turn-launcher-terminal-results.test.ts",
+      ],
+    );
+  });
+
   it("keeps unknown root surfaces cheap by default", () => {
     expect(
       resolveChangedTargetArgs(["--changed", "origin/main"], process.cwd(), () => [
@@ -2092,12 +2113,13 @@ describe("scripts/test-projects changed-target routing", () => {
   });
 
   it("routes the top-level extensions target to every extension shard", () => {
+    const codexConfig = "test/vitest/vitest.extension-codex.config.ts";
     const matrixConfig = "test/vitest/vitest.extension-matrix.config.ts";
     const telegramConfig = "test/vitest/vitest.extension-telegram.config.ts";
     const plans = buildVitestRunPlans(["extensions"], process.cwd());
     const matrixPlans = plans.filter((plan) => plan.config === matrixConfig);
     const telegramPlans = plans.filter((plan) => plan.config === telegramConfig);
-    const boundedConfigs = new Set([matrixConfig, telegramConfig]);
+    const boundedConfigs = new Set([codexConfig, matrixConfig, telegramConfig]);
 
     expect(plans.filter((plan) => !boundedConfigs.has(plan.config))).toEqual(
       listFullExtensionVitestProjectConfigs()
@@ -2157,7 +2179,6 @@ describe("scripts/test-projects changed-target routing", () => {
       fs.writeFileSync(includeFile, JSON.stringify(files));
       const specs = createVitestRunSpecs([config], {
         baseEnv: { OPENCLAW_VITEST_INCLUDE_FILE: includeFile },
-        tempDir,
       });
 
       expect(specs).toHaveLength(5);
@@ -2213,7 +2234,6 @@ describe("scripts/test-projects changed-target routing", () => {
       fs.writeFileSync(includeFile, JSON.stringify([`${directory}/src/example.test.ts`]));
       const [spec] = createVitestRunSpecs([directory], {
         baseEnv: { OPENCLAW_VITEST_INCLUDE_FILE: includeFile },
-        tempDir,
       });
 
       expect(spec).toMatchObject({
@@ -2240,6 +2260,37 @@ describe("scripts/test-projects changed-target routing", () => {
     expect(plans.flatMap((plan) => plan.includePatterns ?? [])).toEqual(
       listExtensionTestFilesForRoots(["extensions/matrix"]),
     );
+  });
+
+  it("bounds an explicit Codex directory target across process lifetimes", () => {
+    const config = "test/vitest/vitest.extension-codex.config.ts";
+    const plans = buildVitestRunPlans(["extensions/codex"], process.cwd());
+
+    expect(plans.length).toBeGreaterThan(1);
+    expect(plans).toHaveLength(expectedCodexTestProcessCount());
+    expect(plans.every((plan) => plan.config === config)).toBe(true);
+    expect(
+      plans.every((plan) => (plan.includePatterns?.length ?? 0) <= CODEX_TEST_PROCESS_FILE_LIMIT),
+    ).toBe(true);
+    expect(plans.flatMap((plan) => plan.includePatterns ?? [])).toEqual(
+      listExtensionTestFilesForRoots(["extensions/codex"]),
+    );
+  });
+
+  it("keeps an explicit Codex file target in one process", () => {
+    const testFile = listExtensionTestFilesForRoots(["extensions/codex"])[0];
+    if (!testFile) {
+      throw new Error("expected a Codex test fixture");
+    }
+
+    expect(buildVitestRunPlans([testFile], process.cwd())).toEqual([
+      {
+        config: "test/vitest/vitest.extension-codex.config.ts",
+        forwardedArgs: [],
+        includePatterns: [testFile],
+        watchMode: false,
+      },
+    ]);
   });
 
   it("keeps grouped Matrix targets covered when bounding the directory", () => {
@@ -2415,7 +2466,7 @@ describe("scripts/test-projects changed-target routing", () => {
       includePatterns: ["ui/src/e2e/**/*.test.ts"],
     });
 
-    expect(buildVitestArgs(["ui/src/e2e"])).toContain("--configLoader");
+    expect(createVitestRunSpecs(["ui/src/e2e"])[0]?.pnpmArgs).toContain("--configLoader");
   });
 
   it("routes auto-reply route source files to route regression tests", () => {
@@ -2530,13 +2581,11 @@ describe("scripts/test-projects changed-target routing", () => {
   });
 
   it("uses collision-resistant include-file names for scoped Vitest specs", () => {
-    const tempDir = path.join("tmp", "openclaw-vitest-specs");
     const [spec] = createVitestRunSpecs(["src/plugin-sdk/temp-path.test.ts"], {
       baseEnv: {},
-      tempDir,
     });
 
-    expect(path.dirname(spec?.includeFilePath ?? "")).toBe(tempDir);
+    expect(path.dirname(spec?.includeFilePath ?? "")).toBe(os.tmpdir());
     expect(path.basename(spec?.includeFilePath ?? "")).toMatch(
       /^openclaw-vitest-include-[0-9a-f-]{36}-0\.json$/u,
     );

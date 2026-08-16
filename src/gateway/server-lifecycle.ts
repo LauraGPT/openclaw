@@ -34,6 +34,7 @@ import {
   shouldRetainControlUiDeviceAuthMigrationSession,
 } from "./server-public.js";
 import type { prepareGatewayKernelState } from "./server-runtime-state-prepare.js";
+import type { GatewayShutdownRuntime } from "./server-shutdown.runtime.js";
 import {
   getHealthVersion,
   incrementPresenceVersion,
@@ -51,20 +52,9 @@ export async function prepareGatewayLifecycle(params: {
   log: GatewayLogger;
   logCron: GatewayLogger;
   diagnosticsEnabled: boolean;
-  loadGatewayCloseModule: () => Promise<typeof import("./server-close.runtime.js")>;
-  closeMcpLoopbackServerOnDemand: () => Promise<void>;
-  stopTaskRegistryMaintenanceOnDemand: () => Promise<void>;
+  shutdownRuntime: GatewayShutdownRuntime;
 }) {
-  const {
-    runtime,
-    port,
-    log,
-    logCron,
-    diagnosticsEnabled,
-    loadGatewayCloseModule,
-    closeMcpLoopbackServerOnDemand,
-    stopTaskRegistryMaintenanceOnDemand,
-  } = params;
+  const { runtime, port, log, logCron, diagnosticsEnabled, shutdownRuntime } = params;
   const {
     minimalTestGateway,
     controlUiDeviceAuthMigration,
@@ -103,6 +93,7 @@ export async function prepareGatewayLifecycle(params: {
     desktopSessionRegistry,
     nodeDesktopStreamBroker,
     bindDeviceNodeControl,
+    workerPlacementRuntime,
   } = runtime;
   const completeControlUiDeviceAuthMigrationForEffectiveOperator = (
     device: EffectiveOperatorDeviceIdentity,
@@ -181,6 +172,9 @@ export async function prepareGatewayLifecycle(params: {
     listRegisteredNodePluginToolCommands: () => pluginRuntime.registry.nodeHostCommands,
     nodePluginToolsEnabled: cfgAtStart.gateway?.nodes?.pluginTools?.enabled !== false,
     nodeSkillsEnabled: cfgAtStart.gateway?.nodes?.allowSkills !== false,
+    onRunnerInventoryChanged: (nodeId) => {
+      void workerPlacementRuntime?.scheduleNodeWorkspaceRetention(nodeId);
+    },
     onPairingInvalidated: ({ nodeId, connId }) => {
       void nodeDesktopServiceRef.current?.stopNode(nodeId);
       upsertPresence(nodeId, { reason: "disconnect" });
@@ -481,8 +475,7 @@ export async function prepareGatewayLifecycle(params: {
     disposeNodeConnectionNotifications(nodeRegistry);
     watchNodeHttpRuntime.close();
     clearPluginMetadataLifecycleCaches();
-    const { runGatewayClosePrelude } = await loadGatewayCloseModule();
-    await runGatewayClosePrelude({
+    await shutdownRuntime.runGatewayClosePrelude({
       ...(diagnosticsEnabled ? { stopDiagnostics: stopDiagnosticHeartbeat } : {}),
       clearSkillsRefreshTimer: () => {
         if (!runtimeState?.skillsRefreshTimer) {
@@ -503,7 +496,7 @@ export async function prepareGatewayLifecycle(params: {
         await monitor?.waitForIdle();
       },
       stopReadinessEventLoopHealth: readinessEventLoopHealth.stop,
-      closeMcpServer: closeMcpLoopbackServerOnDemand,
+      closeMcpServer: shutdownRuntime.closeMcpLoopbackServer,
     });
   };
   const { getRuntimeSnapshot, startChannels, startChannel, stopChannel, markChannelLoggedOut } =
@@ -533,11 +526,9 @@ export async function prepareGatewayLifecycle(params: {
   };
   const createCloseHandler = () => async (optsValue?: GatewayCloseOptions) => {
     const channelIds = listLoadedChannelPlugins().map((plugin) => plugin.id as ChannelId);
-    const { createGatewayCloseHandler, drainActiveSessionsForShutdown } =
-      await loadGatewayCloseModule();
     const transport = transportBridge.current();
     await transport?.portalService.closeAll();
-    await createGatewayCloseHandler({
+    await shutdownRuntime.createGatewayCloseHandler({
       bonjourStop: runtimeState.bonjourStop,
       tailscaleCleanup: runtimeState.tailscaleCleanup,
       clearSecretsRuntimeSnapshot: clearSecretsRuntimeSnapshotState,
@@ -548,7 +539,7 @@ export async function prepareGatewayLifecycle(params: {
       cron: runtimeState.cronState.cron,
       heartbeatRunner: runtimeState.heartbeatRunner,
       updateCheckStop: runtimeState.stopGatewayUpdateCheck,
-      stopTaskRegistryMaintenance: stopTaskRegistryMaintenanceOnDemand,
+      stopTaskRegistryMaintenance: shutdownRuntime.stopTaskRegistryMaintenance,
       nodePresenceTimers,
       broadcast,
       tickInterval: runtimeState.tickInterval,
@@ -580,9 +571,7 @@ export async function prepareGatewayLifecycle(params: {
         if (sessionKeys.size === 0 && sessionIds.size === 0) {
           return;
         }
-        const { markRestartAbortedMainSessions } =
-          await import("../agents/main-session-recovery/main-session-restart-recovery.js");
-        await markRestartAbortedMainSessions({
+        await shutdownRuntime.markRestartAbortedMainSessions({
           cfg: getRuntimeConfig(),
           sessionKeys,
           sessionIds,
@@ -601,7 +590,12 @@ export async function prepareGatewayLifecycle(params: {
             httpServers: transport.httpServers,
           }
         : {}),
-      drainActiveSessionsForShutdown,
+      drainActiveSessionsForShutdown: shutdownRuntime.drainActiveSessionsForShutdown,
+      disposeAllBundleLspRuntimes: shutdownRuntime.disposeAllBundleLspRuntimes,
+      drainRetainedOpenAiEmbeddingProviders: shutdownRuntime.drainRetainedOpenAiEmbeddingProviders,
+      stopGmailWatcher: shutdownRuntime.stopGmailWatcher,
+      disposeAllCodeModeRuns: shutdownRuntime.disposeAllCodeModeRuns,
+      closeProviderTransportDispatcherPool: shutdownRuntime.closeProviderTransportDispatcherPool,
     })(optsValue);
   };
   let clearFallbackGatewayContextForServer = () => {};
@@ -672,6 +666,7 @@ export async function prepareGatewayLifecycle(params: {
     unavailableGatewayMethods,
     kernel,
     pluginHostServices,
+    shutdownRuntime,
     lifecycle,
     postReadyState,
     cronReconciliation,
