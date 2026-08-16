@@ -50,6 +50,7 @@ import {
 } from "./chat-pane-state.ts";
 import { dismissRealtimeTalkError } from "./chat-realtime.ts";
 import { activeChatRunStartupStatus } from "./chat-run-startup.ts";
+import type { ChatSendOptions } from "./chat-send-contract.ts";
 import { refreshChatCommands, refreshPageChat } from "./chat-state-refresh.ts";
 import {
   resolveChatAgentId,
@@ -447,6 +448,7 @@ export class ChatPane extends ChatPaneBrowserAnnotationRender {
       // A dismissed open PR still exists, so the row must not offer a duplicate.
       pullRequestsRateLimited: this.sessionPullRequestsRateLimited,
       pullRequestsExpanded: this.sessionPullRequestsExpanded,
+      onOpenSessionDiff: sessionWorkspace.onOpenDiff,
       onExpandPullRequests: () => {
         this.sessionPullRequestsExpanded = true;
         this.requestUpdate();
@@ -519,12 +521,12 @@ export class ChatPane extends ChatPaneBrowserAnnotationRender {
         state.requestUpdate?.();
       },
       onRemoveAttachment: this.removeBrowserAnnotation,
-      onSend: () =>
+      onSend: (options?: ChatSendOptions) =>
         catalogKey
           ? void this.continueCatalogSession(catalogKey)
           : suggestionViewer
             ? void this.addCurrentSessionSuggestion()
-            : void state.handleSendChat(),
+            : void state.handleSendChat(undefined, options),
       onCompact: sessionActionCallbacks.onCompact,
       // Checkpoint deep-link carries the archived filter so the row stays findable.
       onOpenSessionCheckpoints: () => {
