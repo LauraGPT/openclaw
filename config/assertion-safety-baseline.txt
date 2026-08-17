@@ -1850,7 +1850,7 @@ src/agents/embedded-agent-runner/run.overflow-compaction.harness.ts	5
 src/agents/embedded-agent-runner/run/abortable.ts	2
 src/agents/embedded-agent-runner/run/attempt-async-tasks.ts	1
 src/agents/embedded-agent-runner/run/attempt-before-agent-run.ts	2
-src/agents/embedded-agent-runner/run/attempt-client-tools.ts	1
+src/agents/embedded-agent-runner/run/attempt-client-tools.ts	2
 src/agents/embedded-agent-runner/run/attempt-context-summary.ts	2
 src/agents/embedded-agent-runner/run/attempt-execution-phase.ts	1
 src/agents/embedded-agent-runner/run/attempt-finalize.ts	3
@@ -3493,7 +3493,6 @@ src/node-host/invoke-agent-cli-claude-params.ts	4
 src/node-host/invoke-agent-cli-claude.ts	2
 src/node-host/invoke-file-commands.ts	1
 src/node-host/invoke-payload.ts	5
-src/node-host/invoke-system-run-plan.ts	3
 src/node-host/invoke.ts	8
 src/node-host/mcp.ts	3
 src/node-host/node-worker-bundle-installer.ts	1
@@ -4247,7 +4246,6 @@ ui/src/pages/chat/connect-error.ts	1
 ui/src/pages/chat/critical-observer-notice.ts	1
 ui/src/pages/chat/export.ts	1
 ui/src/pages/chat/input-history.ts	3
-ui/src/pages/chat/models.ts	1
 ui/src/pages/chat/performance.ts	1
 ui/src/pages/chat/realtime-talk-gateway-relay.ts	1
 ui/src/pages/chat/realtime-talk-google-live.ts	2
