@@ -260,6 +260,7 @@ export function readPluginSdkSurfaceBudgets(env: NodeJS.ProcessEnv = process.env
       // +3: session-catalog terminal-start provider request and Gateway params/result contracts.
       // +1: worker desktop endpoint contract for desktop-capable worker leases.
       // +1: closed worker desktop app metadata for provider-advertised launchers.
+      // +1: provider-authored machine option metadata for cloud-session sizing.
       // +1: native command spec merger through the native-command-registry facade.
       // +8: focused plugin command runtime factory, dispatch symbol, and six readonly contracts.
       // -2: remove unused WhatsApp-specific ack policy exports from channel-feedback.
@@ -293,7 +294,7 @@ export function readPluginSdkSurfaceBudgets(env: NodeJS.ProcessEnv = process.env
       // +1: strict explicit agent-id normalization without default-agent fallback.
       // +5: session-catalog paging capability, family/node-host composers, and option contracts.
       // +3: two focused primitives and the closed read-only SecretRef result contract.
-      4337,
+      4338,
       env,
     ),
     publicFunctionExports: readPluginSdkSurfaceBudgetEnv(
