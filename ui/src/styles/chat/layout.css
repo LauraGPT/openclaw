@@ -1706,7 +1706,11 @@ button.chat-reply-preview--message:disabled {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 0 16px 8px;
+  box-sizing: border-box;
+  width: calc(100% - 36px);
+  max-width: var(--chat-thread-max-width, 48rem);
+  margin-inline: auto;
+  padding: 0 0 8px;
 }
 
 .session-suggestion {
@@ -2535,7 +2539,9 @@ button.chat-pr__diff {
   padding: 8px 10px 0;
 }
 
-.agent-chat__composer-status-stack:not(:has(.compaction-indicator, .agent-chat__goal)) {
+.agent-chat__composer-status-stack:not(
+  :has(.compaction-indicator, .agent-chat__goal, .session-progress-card)
+) {
   display: none;
 }
 
@@ -2618,53 +2624,6 @@ button.chat-pr__diff {
   min-height: var(--chat-composer-control-height);
 }
 
-/* Edit-mode marker beside the input: the queued row already names the state, so
-   this only says which mode the composer is in and how to leave it. It takes the
-   row's control height like every other child, so it needs no alignment nudge. */
-.agent-chat__composer-edit {
-  display: inline-flex;
-  align-items: center;
-  gap: 1px;
-  flex-shrink: 0;
-  padding-inline: 7px 3px;
-  border-radius: var(--radius-full);
-  background: var(--info-subtle);
-  color: var(--info);
-}
-
-.agent-chat__composer-edit-icon,
-.agent-chat__composer-edit-cancel {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.agent-chat__composer-edit-icon svg,
-.agent-chat__composer-edit-cancel svg {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.85px;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.agent-chat__composer-edit-cancel {
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-full);
-  background: none;
-  color: inherit;
-  cursor: var(--cursor-action);
-}
-
-.agent-chat__composer-edit-cancel:hover {
-  background: color-mix(in srgb, var(--info) 18%, transparent);
-}
-
 .agent-chat__disabled-reason {
   display: flex;
   align-items: center;
@@ -2723,7 +2682,8 @@ button.chat-pr__diff {
   padding: calc(var(--chat-box-inset) / 2) var(--chat-box-inset);
 }
 
-.agent-chat__composer-meta {
+.agent-chat__composer-meta,
+.agent-chat__composer-context {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -3799,7 +3759,8 @@ button.chat-pr__diff {
     flex: 0 0 26px;
   }
 
-  .agent-chat__composer-meta {
+  .agent-chat__composer-meta,
+  .agent-chat__composer-context {
     margin-left: 0;
   }
 
@@ -3816,7 +3777,7 @@ button.chat-pr__diff {
      text yields before either picker does. */
   .agent-chat__input .agent-chat__composer-controls .chat-composer-model-control {
     flex: 0 1 auto;
-    min-width: 138px;
+    min-width: 144px;
   }
 
   .agent-chat__input .agent-chat__composer-controls .chat-controls__model-picker {
@@ -3830,6 +3791,7 @@ button.chat-pr__diff {
 
   /* The borderless trigger is 30px on desktop; keep a >=44px touch target
      inside the mobile composer row. */
+  .agent-chat__input .agent-chat__composer-meta .chat-controls__inline-select-trigger,
   .agent-chat__input .agent-chat__composer-controls .chat-controls__inline-select-trigger {
     width: fit-content;
     max-width: 100%;
@@ -4495,6 +4457,91 @@ button.chat-pr__diff {
 .chat-controls__effort-menu {
   width: min(330px, calc(100vw - 24px));
   max-height: min(280px, var(--auto-size-available-height, calc(100vh - 120px)));
+}
+
+.chat-controls__permission-picker::part(menu) {
+  width: min(360px, calc(100vw - 24px));
+  padding: 6px;
+  overflow: hidden;
+}
+
+.chat-controls__permission-icon,
+.chat-controls__permission-lock {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.chat-controls__permission-option-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.chat-controls__permission-label--full {
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.chat-controls__permission-option::part(base) {
+  align-items: flex-start;
+  min-height: 54px;
+  border-radius: var(--radius-sm);
+}
+
+.chat-controls__permission-option--selected::part(base) {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.chat-controls__permission-option-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.chat-controls__permission-option-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.chat-controls__permission-option-description {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.chat-controls__permission-shortcut {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.chat-controls__permission-root {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 6px -6px -6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.chat-controls__permission-root code {
+  min-width: 0;
+  color: var(--text);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-controls__model-search-wrap {
@@ -5283,6 +5330,10 @@ button.chat-pr__diff {
     gap: 6px;
   }
 
+  .session-suggestions {
+    width: calc(100% - 8px);
+  }
+
   .chat-run-error {
     width: calc(100% - 8px);
     margin: 6px 4px 0;
@@ -5320,6 +5371,16 @@ button.chat-pr__diff {
 }
 
 @media (max-width: 640px) {
+  .agent-chat__composer-meta .chat-controls__permission-trigger {
+    width: 44px;
+  }
+
+  .agent-chat__composer-meta
+    .chat-controls__permission-trigger
+    .chat-controls__inline-select-label {
+    display: none;
+  }
+
   .agent-chat__composer-controls {
     align-items: center;
     flex-direction: row;

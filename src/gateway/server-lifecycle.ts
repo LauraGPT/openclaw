@@ -51,7 +51,6 @@ export async function prepareGatewayLifecycle(params: {
   const { runtime, port, log, logCron, diagnosticsEnabled, shutdownRuntime } = params;
   const {
     minimalTestGateway,
-    workerGatewayEndpoint,
     transportBridge,
     sessionMessageSubscribers,
     isConnectionActive,
@@ -88,7 +87,6 @@ export async function prepareGatewayLifecycle(params: {
     bindDeviceNodeControl,
     workerPlacementRuntime,
   } = runtime;
-  workerGatewayEndpoint.resolve = transportBridge.getWorkerIngressEndpoint;
   const subscribeSessionMessageEvents: GatewayRequestContext["subscribeSessionMessageEvents"] = (
     connId,
     sessionKey,
@@ -253,12 +251,13 @@ export async function prepareGatewayLifecycle(params: {
     },
     setPostAttachHandles: (handles: {
       stopGatewayUpdateCheck: typeof runtimeState.stopGatewayUpdateCheck;
-      tailscaleCleanup: typeof runtimeState.tailscaleCleanup;
       pluginServices: typeof runtimeState.pluginServices;
     }) => {
       runtimeState.stopGatewayUpdateCheck = handles.stopGatewayUpdateCheck;
-      runtimeState.tailscaleCleanup = handles.tailscaleCleanup;
       runtimeState.pluginServices = handles.pluginServices;
+    },
+    setTailscaleCleanup: (cleanup: typeof runtimeState.tailscaleCleanup) => {
+      runtimeState.tailscaleCleanup = cleanup;
     },
     setPluginServices: (pluginServices: typeof runtimeState.pluginServices) => {
       runtimeState.pluginServices = pluginServices;

@@ -39,7 +39,7 @@ import {
   loadOriginDeviceTokenReadOnly,
 } from "../infra/device-auth-store.js";
 import {
-  loadDeviceIdentityIfPresentReadOnly,
+  loadDeviceIdentityIfPresent,
   loadOrCreateDeviceIdentity,
   type DeviceIdentity,
 } from "../infra/device-identity.js";
@@ -307,27 +307,10 @@ export function formatGatewayTransportErrorJson(value: unknown): GatewayTranspor
 export function formatGatewayClientRequestErrorJson(
   value: unknown,
 ): GatewayClientRequestErrorJson | null {
-  if (!(value instanceof Error) || value.name !== "GatewayClientRequestError") {
+  if (!isGatewayClientRequestError(value)) {
     return null;
   }
-  const requestError = value as Error & {
-    gatewayCode?: unknown;
-    details?: unknown;
-    retryable?: unknown;
-    retryAfterMs?: unknown;
-  };
-  if (
-    typeof requestError.gatewayCode !== "string" ||
-    requestError.gatewayCode.length === 0 ||
-    requestError.message.length === 0 ||
-    typeof requestError.retryable !== "boolean" ||
-    (requestError.retryAfterMs !== undefined &&
-      (typeof requestError.retryAfterMs !== "number" ||
-        !Number.isInteger(requestError.retryAfterMs) ||
-        requestError.retryAfterMs < 0))
-  ) {
-    return null;
-  }
+  const requestError = value;
   return {
     ok: false,
     error: {
@@ -341,6 +324,35 @@ export function formatGatewayClientRequestErrorJson(
         : {}),
     },
   };
+}
+
+export function isGatewayClientRequestError(value: unknown): value is Error & {
+  gatewayCode: string;
+  details?: unknown;
+  retryable: boolean;
+  retryAfterMs?: number;
+} {
+  if (!(value instanceof Error) || value.name !== "GatewayClientRequestError") {
+    return false;
+  }
+  const requestError = value as Error & {
+    gatewayCode?: unknown;
+    retryable?: unknown;
+    retryAfterMs?: unknown;
+  };
+  if (
+    typeof requestError.gatewayCode !== "string" ||
+    requestError.gatewayCode.length === 0 ||
+    requestError.message.length === 0 ||
+    typeof requestError.retryable !== "boolean" ||
+    (requestError.retryAfterMs !== undefined &&
+      (typeof requestError.retryAfterMs !== "number" ||
+        !Number.isInteger(requestError.retryAfterMs) ||
+        requestError.retryAfterMs < 0))
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /** Preserve machine-readable output for auth failures raised before transport startup. */
@@ -501,7 +513,7 @@ function shouldOmitDeviceIdentityForGatewayCall(params: {
 function resolveDeviceIdentityForGatewayCall(sharedStateMode?: "read-only"): DeviceIdentity | null {
   try {
     return sharedStateMode === "read-only"
-      ? loadDeviceIdentityIfPresentReadOnly()
+      ? loadDeviceIdentityIfPresent()
       : loadOrCreateDeviceIdentity();
   } catch {
     // Read-only or restricted environments should still be able to call the
@@ -645,7 +657,7 @@ async function resolveGatewayCallContext(
   const config =
     opts.config ?? (canSkipConfigLoad ? ({} as OpenClawConfig) : await loadGatewayConfig());
   const configPath = opts.configPath ?? resolveGatewayConfigPath(process.env);
-  const isRemoteMode = config.gateway?.mode === "remote";
+  const isRemoteMode = opts.localPortOverride === undefined && config.gateway?.mode === "remote";
   return {
     config,
     configPath,
@@ -668,7 +680,7 @@ export async function isImplicitLocalGatewayTarget(
     return false;
   }
   const config = opts.config ?? (await loadGatewayConfig());
-  return config.gateway?.mode !== "remote";
+  return opts.localPortOverride !== undefined || config.gateway?.mode !== "remote";
 }
 
 function ensureRemoteModeUrlConfigured(params: {
@@ -852,6 +864,7 @@ async function executeGatewayRequestWithScopes<T>(params: {
   connectionDetails: GatewayConnectionDetails;
   deviceIdentity: DeviceIdentity | null;
   deviceAuthScope?: string;
+  storedAuth?: DeviceAuthEntry;
   surfaceGatewayClientRequestErrors: boolean;
 }): Promise<T> {
   const {
@@ -867,6 +880,7 @@ async function executeGatewayRequestWithScopes<T>(params: {
     safeTimerTimeoutMs,
     deviceIdentity,
     deviceAuthScope,
+    storedAuth,
     surfaceGatewayClientRequestErrors,
   } = params;
   return await new Promise<T>((resolve, reject) => {
@@ -957,6 +971,7 @@ async function executeGatewayRequestWithScopes<T>(params: {
       ...(Array.isArray(scopes) ? { scopes } : {}),
       deviceIdentity,
       ...(deviceAuthScope ? { deviceAuthScope } : {}),
+      ...(storedAuth ? { preparedDeviceAuth: storedAuth } : {}),
       ...(opts.sharedStateMode ? { sharedStateMode: opts.sharedStateMode } : {}),
       minProtocol: opts.minProtocol ?? MIN_CLIENT_PROTOCOL_VERSION,
       maxProtocol: opts.maxProtocol ?? PROTOCOL_VERSION,
@@ -1032,7 +1047,7 @@ async function executeGatewayRequestWithScopes<T>(params: {
         );
       },
       onConnectError: (err) => {
-        const isGatewayClientRequestError = err.name === "GatewayClientRequestError";
+        const gatewayClientRequestError = err.name === "GatewayClientRequestError";
         const isAgentRuntimeIdentityConnectError =
           Boolean(opts.agentRuntimeIdentityToken) &&
           isRequiredAgentRuntimeIdentityConnectError(err);
@@ -1040,7 +1055,7 @@ async function executeGatewayRequestWithScopes<T>(params: {
           isGatewayConnectAssemblyError(err) ||
           isAgentRuntimeIdentityConnectError ||
           isAllowlistedGatewayConnectRequestError(err) ||
-          (surfaceGatewayClientRequestErrors && isGatewayClientRequestError);
+          (surfaceGatewayClientRequestErrors && gatewayClientRequestError);
         if (settled || !shouldSurface) {
           return;
         }
@@ -1227,6 +1242,7 @@ async function callGatewayWithScopes<T = Record<string, unknown>>(
     connectionDetails,
     deviceIdentity,
     deviceAuthScope,
+    ...(storedAuth ? { storedAuth } : {}),
     surfaceGatewayClientRequestErrors:
       useStoredDeviceAuth ||
       opts.requireLocalBackendSharedAuth === true ||
