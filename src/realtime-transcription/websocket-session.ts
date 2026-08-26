@@ -75,7 +75,6 @@ function defaultParseMessage(payload: Buffer): unknown {
 class WebSocketRealtimeTranscriptionSession<Event> implements RealtimeTranscriptionSession {
   private closeTimer: ReturnType<typeof setTimeout> | undefined;
   private closed = false;
-  private connected = false;
   private currentUrl = "";
   private queuedAudio: Array<Buffer | undefined> = [];
   private queuedAudioHead = 0;
@@ -135,7 +134,6 @@ class WebSocketRealtimeTranscriptionSession<Event> implements RealtimeTranscript
     }
     this.closed = true;
     this.cancelConnecting?.();
-    this.connected = false;
     this.ready = false;
     this.readySinceMs = undefined;
     this.reconnectSupervisor.cancel();
@@ -159,7 +157,7 @@ class WebSocketRealtimeTranscriptionSession<Event> implements RealtimeTranscript
   }
 
   isConnected(): boolean {
-    return this.connected && this.ready;
+    return this.ready;
   }
 
   private get closeTimeoutMs(): number {
@@ -336,7 +334,6 @@ class WebSocketRealtimeTranscriptionSession<Event> implements RealtimeTranscript
             return;
           }
           opened = true;
-          this.connected = true;
           this.captureLocalOpen();
           try {
             this.options.onOpen?.(transport);
@@ -385,7 +382,6 @@ class WebSocketRealtimeTranscriptionSession<Event> implements RealtimeTranscript
           clearConnectTimeout();
           this.captureClose(code, reasonBuffer);
           const readyForMs = this.readySinceMs === undefined ? 0 : Date.now() - this.readySinceMs;
-          this.connected = false;
           this.ready = false;
           this.readySinceMs = undefined;
           if (readyForMs >= RECONNECT_STABLE_RESET_MS) {
@@ -552,7 +548,6 @@ class WebSocketRealtimeTranscriptionSession<Event> implements RealtimeTranscript
       clearTimeout(this.closeTimer);
       this.closeTimer = undefined;
     }
-    this.connected = false;
     this.ready = false;
     this.readySinceMs = undefined;
     this.ws = null;
