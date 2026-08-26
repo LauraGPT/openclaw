@@ -4253,6 +4253,7 @@ export const en: TranslationMap = {
   connection: {
     queuedCount: "{count} queued",
     reconnecting: "Reconnecting…",
+    restarting: "Restarting…",
     retryNow: "Retry now",
     actionsUnavailable: "Actions are unavailable while the Gateway reconnects.",
     sessionOperationCompletedPreviousConnection:
@@ -5704,6 +5705,10 @@ export const en: TranslationMap = {
       eyebrow: "Question",
       summaryLabel: "Question outcome",
       ownAnswerFor: "Your own answer for {header}",
+      storeRequestedBy: "Requested by {agent} · {session}",
+      storeEntry: "Stores {name} as {kind}",
+      storeReplacement: "Replaces {name} — last updated {updated}",
+      storeReplacementBy: "Replaces {name} — last updated {updated} by {updatedBy}",
       submitting: "Submitting…",
       submitFailed: "Could not submit: {error}",
       answered: "Answered",
@@ -5715,7 +5720,7 @@ export const en: TranslationMap = {
     imageLightbox: {
       label: "Image preview: {title}",
       open: "Open image {title}",
-      openOriginal: "Open original",
+      openOriginal: "Open in new tab",
       copy: "Copy image",
       download: "Download image",
       copyFailed: "Could not copy this image. Check clipboard access and try again.",
