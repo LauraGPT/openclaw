@@ -1,19 +1,19 @@
 import { html, nothing } from "lit";
 import type { SessionPlacementDiskSpace } from "../../../../packages/gateway-protocol/src/schema/session-placement.ts";
-import type { ApplicationCloudStartupStatus } from "../../app/cloud-session-startup.ts";
+import type { ApplicationPlacementStartupStatus } from "../../app/session-placement-startup.ts";
 import { icons } from "../../components/icons.ts";
 import { t } from "../../i18n/index.ts";
 import { formatBytes } from "../../lib/agents/display.ts";
-import { renderCloudStartupStatus } from "./components/chat-working-indicator.ts";
+import { renderPlacementStartupStatus } from "./components/chat-working-indicator.ts";
 import { renderWorkspaceConflictNotice } from "./components/chat-workspace-conflict.ts";
 import type { WorkspaceResultConflict } from "./workspace-conflict.ts";
 
-export type ChatCloudStartupNoticeProps = {
-  cloudStartup?: ApplicationCloudStartupStatus | null;
-  onRetryCloudStartup?: () => void;
+export type ChatPlacementStartupNoticeProps = {
+  placementStartup?: ApplicationPlacementStartupStatus | null;
+  onRetrySessionPlacementStartup?: () => void;
 };
 
-type ChatViewNoticesProps = ChatCloudStartupNoticeProps & {
+type ChatViewNoticesProps = ChatPlacementStartupNoticeProps & {
   diskSpace?: SessionPlacementDiskSpace;
   error?: string | null;
   focusMode?: boolean;
@@ -34,21 +34,25 @@ function renderDiskSpaceNotice(diskSpace: SessionPlacementDiskSpace | undefined)
   const critical = diskSpace.status === "critical";
   return html`
     <div
-      class="callout ${critical ? "danger" : "warn"} chat-cloud-disk-space-notice"
+      class="chat-composer-neighbor-card chat-composer-neighbor-card--${critical
+        ? "danger"
+        : "warn"} chat-cloud-disk-space-notice"
       role=${critical ? "alert" : "status"}
     >
-      <div class="chat-cloud-disk-space-notice__title">
-        <span aria-hidden="true">${icons.alertTriangle}</span>
+      <span class="chat-composer-neighbor-card__icon" aria-hidden="true"
+        >${icons.alertTriangle}</span
+      >
+      <div class="chat-composer-neighbor-card__copy">
         <strong
           >${t(critical ? "chat.diskSpace.criticalTitle" : "chat.diskSpace.warningTitle")}</strong
         >
+        <span>
+          ${t(critical ? "chat.diskSpace.criticalBody" : "chat.diskSpace.warningBody", {
+            percent: String(usedPercent),
+            free: formatBytes(diskSpace.availableBytes),
+          })}
+        </span>
       </div>
-      <p>
-        ${t(critical ? "chat.diskSpace.criticalBody" : "chat.diskSpace.warningBody", {
-          percent: String(usedPercent),
-          free: formatBytes(diskSpace.availableBytes),
-        })}
-      </p>
     </div>
   `;
 }
@@ -58,9 +62,16 @@ export function renderChatViewNotices(props: ChatViewNoticesProps) {
     ${renderDiskSpaceNotice(props.diskSpace)}
     ${props.error
       ? html`
-          <div class="chat-error" role="alert">
-            <span class="chat-error__dot" aria-hidden="true"></span>
-            <span class="chat-error__content">${props.error}</span>
+          <div
+            class="chat-composer-neighbor-card chat-composer-neighbor-card--danger chat-error"
+            role="alert"
+          >
+            <span class="chat-composer-neighbor-card__icon" aria-hidden="true"
+              >${icons.alertTriangle}</span
+            >
+            <span class="chat-composer-neighbor-card__copy chat-error__content"
+              ><strong>${props.error}</strong></span
+            >
             ${props.onDismissError
               ? html`
                   <openclaw-tooltip .content=${t("chat.actions.dismissError")}>
@@ -96,6 +107,6 @@ export function renderChatViewNotices(props: ChatViewNoticesProps) {
           </openclaw-tooltip>
         `
       : nothing}
-    ${renderCloudStartupStatus(props.cloudStartup, props.onRetryCloudStartup)}
+    ${renderPlacementStartupStatus(props.placementStartup, props.onRetrySessionPlacementStartup)}
   `;
 }

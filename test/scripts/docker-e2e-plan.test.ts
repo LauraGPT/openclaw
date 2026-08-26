@@ -956,7 +956,7 @@ describe("scripts/lib/docker-e2e-plan", () => {
     const plan = planFor({
       selectedLaneNames: ["published-upgrade-survivor"],
       upgradeSurvivorBaselines: "2026.4.29 2026.4.23",
-      upgradeSurvivorScenarios: "base feishu-channel tilde-log-path",
+      upgradeSurvivorScenarios: "base feishu-channel tilde-log-path sqlite-volume",
     });
 
     expect(plan.lanes.map(summarizeLane)).toEqual([
@@ -976,6 +976,11 @@ describe("scripts/lib/docker-e2e-plan", () => {
         "tilde-log-path",
       ),
       publishedUpgradeSurvivorLane(
+        "published-upgrade-survivor-2026.4.29-sqlite-volume",
+        "openclaw@2026.4.29",
+        "sqlite-volume",
+      ),
+      publishedUpgradeSurvivorLane(
         "published-upgrade-survivor-2026.4.23",
         "openclaw@2026.4.23",
         "base",
@@ -990,7 +995,35 @@ describe("scripts/lib/docker-e2e-plan", () => {
         "openclaw@2026.4.23",
         "tilde-log-path",
       ),
+      publishedUpgradeSurvivorLane(
+        "published-upgrade-survivor-2026.4.23-sqlite-volume",
+        "openclaw@2026.4.23",
+        "sqlite-volume",
+      ),
     ]);
+  });
+
+  it("plans the prerelease registry survivor only when explicitly requested", () => {
+    const laneName = "published-upgrade-survivor-2026.7.1-2-prerelease-plugin-registry";
+    const explicitPlan = planFor({
+      selectedLaneNames: ["published-upgrade-survivor"],
+      upgradeSurvivorBaselines: "2026.7.1-2",
+      upgradeSurvivorScenarios: "prerelease-plugin-registry",
+    });
+
+    expect(explicitPlan.lanes.map(summarizeLane)).toEqual([
+      publishedUpgradeSurvivorLane(laneName, "openclaw@2026.7.1-2", "prerelease-plugin-registry"),
+    ]);
+
+    for (const aggregateScenario of ["reported-issues", "far-reaching"]) {
+      const aggregateLaneNames = planFor({
+        selectedLaneNames: ["published-upgrade-survivor"],
+        upgradeSurvivorBaselines: "2026.7.1-2",
+        upgradeSurvivorScenarios: aggregateScenario,
+      }).lanes.map((lane) => lane.name);
+
+      expect(aggregateLaneNames).not.toContain(laneName);
+    }
   });
 
   it("expands reported upgrade issue scenarios", () => {
@@ -1014,6 +1047,22 @@ describe("scripts/lib/docker-e2e-plan", () => {
       "published-upgrade-survivor-2026.4.29-versioned-runtime-deps",
       "published-upgrade-survivor-2026.4.29-cron-scheduled-authority",
     ]);
+  });
+
+  it("keeps SQLite volume stress out of release soak and in far-reaching runs", () => {
+    const scenariosFor = (upgradeSurvivorScenarios: string) =>
+      planFor({
+        selectedLaneNames: ["published-upgrade-survivor"],
+        upgradeSurvivorBaselines: "2026.7.1-2",
+        upgradeSurvivorScenarios,
+      }).lanes.map((lane) => lane.name);
+
+    expect(scenariosFor("reported-issues")).not.toContain(
+      "published-upgrade-survivor-2026.7.1-2-sqlite-volume",
+    );
+    expect(scenariosFor("far-reaching")).toContain(
+      "published-upgrade-survivor-2026.7.1-2-sqlite-volume",
+    );
   });
 
   it("omits trusted-current scenarios unsupported by a frozen target harness", () => {
@@ -1437,6 +1486,8 @@ describe("scripts/lib/docker-e2e-plan", () => {
     expect(lane.timeoutMs).toBe(1_800_000);
     expect(plan.needs.bareImage).toBe(true);
     expect(plan.needs.package).toBe(true);
+    expect(plan.requiredPrepublishPluginPackages).toEqual(["@openclaw/codex"]);
+    expect(plan.needs.prepublishPluginRegistry).toBe(true);
   });
 
   it("plans the plugin binding command escape lane as source Docker proof", () => {

@@ -34,9 +34,11 @@ function formatModelContextMeta(option: ChatModelPickerOption): string {
 }
 
 export type ChatModelPickerTargetGroup = {
+  errorLabel: string;
   id: string;
   label: string;
   options: readonly { label: string; value: string }[];
+  status: "loading" | "ready" | "error";
 };
 
 // Known models.list runtime ids; mirrors src/status/agent-runtime-label.ts,
@@ -102,6 +104,9 @@ export function renderChatModelPickerOption(params: {
       data-chat-model-option=${params.entry.value}
       data-chat-model-default=${params.entry.isDefault ? "true" : nothing}
       data-chat-model-index=${params.index}
+      data-chat-model-keywords=${params.entry.isDefault
+        ? t("chat.modelControls.default").toLocaleLowerCase()
+        : nothing}
       data-chat-model-name=${modelLabel.toLocaleLowerCase()}
       data-chat-model-provider-label=${providerDisplayLabel(
         params.entry.provider,
@@ -126,10 +131,10 @@ export function renderChatModelPickerOption(params: {
                 >${t("chat.modelControls.default")}</span
               >`
             : nothing}
+          ${modelMeta
+            ? html`<span class="chat-controls__model-option-meta">${modelMeta}</span>`
+            : nothing}
         </span>
-        ${modelMeta
-          ? html`<span class="chat-controls__model-option-meta">${modelMeta}</span>`
-          : nothing}
       </span>
       <span class="chat-controls__model-option-action">
         ${selected

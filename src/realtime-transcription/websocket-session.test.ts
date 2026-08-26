@@ -31,7 +31,6 @@ async function createRealtimeServer(params?: {
   onUpgrade?: (headers: Record<string, string | string[] | undefined>) => void;
   onBinary?: (payload: Buffer) => void;
   onText?: (payload: unknown) => void;
-  requiredProtocol?: string;
 }) {
   const server = createServer();
   const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
@@ -39,14 +38,6 @@ async function createRealtimeServer(params?: {
 
   server.on("upgrade", (request, socket, head) => {
     params?.onUpgrade?.(request.headers);
-    if (
-      params?.requiredProtocol &&
-      request.headers["sec-websocket-protocol"] !== params.requiredProtocol
-    ) {
-      socket.write("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n");
-      socket.destroy();
-      return;
-    }
     wss.handleUpgrade(request, socket, head, (ws) => {
       clients.add(ws);
       ws.on("close", () => clients.delete(ws));
@@ -193,6 +184,69 @@ describe("createRealtimeTranscriptionWebSocketSession", () => {
       encodeSequence(12_999),
       Buffer.from([0xaa, 0xbb, 0xcc]),
     ]);
+    session.close();
+  });
+
+  it.each([
+    { scenario: "socket open", readyOnOpen: true, initialEvent: undefined },
+    {
+      scenario: "provider readiness handshake",
+      readyOnOpen: false,
+      initialEvent: { type: "session.created" },
+    },
+  ])(
+    "rejects startup when queued audio fails during $scenario",
+    async ({ readyOnOpen, initialEvent }) => {
+      const server = await createRealtimeServer({ initialEvent });
+      const onError = vi.fn();
+      const session = createRealtimeTranscriptionWebSocketSession<{ type?: string }>({
+        providerId: "test",
+        callbacks: { onError },
+        url: server.url,
+        readyOnOpen,
+        onMessage: (event, transport) => {
+          if (event.type === "session.created") {
+            transport.markReady();
+          }
+        },
+        sendAudio: () => {
+          throw new Error("queued audio send failed");
+        },
+      });
+
+      session.sendAudio(Buffer.from("queued"));
+      await expect(session.connect()).rejects.toThrow("queued audio send failed");
+      expect(session.isConnected()).toBe(false);
+      expect(onError).toHaveBeenCalledOnce();
+      session.close();
+    },
+  );
+
+  it("does not replay successfully flushed audio after a later frame fails", async () => {
+    const server = await createRealtimeServer();
+    const sentFrames: string[] = [];
+    let shouldFailSecondFrame = true;
+    const session = createRealtimeTranscriptionWebSocketSession({
+      providerId: "test",
+      callbacks: {},
+      url: server.url,
+      readyOnOpen: true,
+      sendAudio: (audio, transport) => {
+        if (audio.toString() === "second" && shouldFailSecondFrame) {
+          shouldFailSecondFrame = false;
+          throw new Error("second frame failed");
+        }
+        sentFrames.push(audio.toString());
+        transport.sendBinary(audio);
+      },
+    });
+
+    session.sendAudio(Buffer.from("first"));
+    session.sendAudio(Buffer.from("second"));
+    await expect(session.connect()).rejects.toThrow("second frame failed");
+    await session.connect();
+
+    expect(sentFrames).toEqual(["first", "second"]);
     session.close();
   });
 
@@ -669,33 +723,6 @@ describe("createRealtimeTranscriptionWebSocketSession", () => {
     await session.connect();
 
     expect(seenAuthHeaders).toEqual(["Bearer resolved-token"]);
-    session.close();
-  });
-
-  it("negotiates configured WebSocket subprotocols", async () => {
-    const seenProtocols: Array<string | string[] | undefined> = [];
-    const server = await createRealtimeServer({
-      requiredProtocol: "binary",
-      onUpgrade: (headers) => {
-        seenProtocols.push(headers["sec-websocket-protocol"]);
-      },
-    });
-    const session = createRealtimeTranscriptionWebSocketSession({
-      providerId: "test",
-      callbacks: {},
-      url: server.url,
-      protocols: ["binary"],
-      readyOnOpen: true,
-      sendAudio: (audio, transport) => {
-        transport.sendBinary(audio);
-      },
-    });
-
-    await session.connect();
-
-    expect(seenProtocols).toEqual(["binary"]);
-    const socket = Reflect.get(session, "ws") as WebSocket;
-    expect(socket.protocol).toBe("binary");
     session.close();
   });
 

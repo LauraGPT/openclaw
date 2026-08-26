@@ -5,12 +5,12 @@ import { css, html, type PropertyValues } from "lit";
 import { property, query } from "lit/decorators.js";
 import { OpenClawLitElement } from "../lit/openclaw-element.ts";
 
-const modalToastLayers = (document.openClawModalToastLayers ??= new Set<HTMLElement>());
+const modalLayers = (document.openClawModalLayers ??= new Set<HTMLElement>());
 
-function setModalToastLayer(modal: HTMLElement, open: boolean) {
-  modalToastLayers.delete(modal);
+function setModalLayer(modal: HTMLElement, open: boolean) {
+  modalLayers.delete(modal);
   if (open) {
-    modalToastLayers.add(modal);
+    modalLayers.add(modal);
   }
 }
 
@@ -113,6 +113,26 @@ export class OpenClawModalDialog extends OpenClawLitElement {
         max-height: 90dvh;
       }
     }
+
+    @media (max-width: 768px),
+      (max-width: 932px) and (max-height: 500px) and (orientation: landscape) {
+      :host(.mobile-edge-to-edge) wa-dialog {
+        --width: 100vw;
+      }
+
+      :host(.mobile-edge-to-edge) wa-dialog::part(dialog) {
+        width: 100vw;
+        height: 100dvh;
+        max-width: none;
+        max-height: none;
+        margin: 0;
+        border-radius: 0;
+      }
+
+      :host(.mobile-edge-to-edge) wa-dialog::part(body) {
+        height: 100%;
+      }
+    }
   `;
 
   override connectedCallback() {
@@ -124,7 +144,7 @@ export class OpenClawModalDialog extends OpenClawLitElement {
   }
 
   override disconnectedCallback() {
-    setModalToastLayer(this, false);
+    setModalLayer(this, false);
     this.syncGeneration += 1;
     const webAwesomeDialog = this.webAwesomeDialog;
     const dialog = webAwesomeDialog?.shadowRoot?.querySelector("dialog");
@@ -162,7 +182,7 @@ export class OpenClawModalDialog extends OpenClawLitElement {
 
   protected override updated(changed: PropertyValues<this>) {
     if (changed.has("open")) {
-      setModalToastLayer(this, this.open);
+      setModalLayer(this, this.open);
     }
     void this.syncAccessibility();
     void this.syncDialogOpen();
@@ -310,7 +330,7 @@ if (!customElements.get("openclaw-modal-dialog")) {
 
 declare global {
   interface Document {
-    openClawModalToastLayers?: Set<HTMLElement>;
+    openClawModalLayers?: Set<HTMLElement>;
   }
 
   interface HTMLElementTagNameMap {

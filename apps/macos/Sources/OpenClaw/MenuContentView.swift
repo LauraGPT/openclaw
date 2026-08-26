@@ -17,6 +17,7 @@ struct MenuContent: View {
     private let dashboardManager = DashboardManager.shared
     private let activityStore = WorkActivityStore.shared
     private let nodesStore = NodesStore.shared
+    private let nodeChannelStatus = MacNodeChannelStatusStore.shared
     @Bindable private var pairingPrompter = NodePairingApprovalPrompter.shared
     @Bindable private var devicePairingPrompter = DevicePairingApprovalPrompter.shared
     @State private var availableMics: [AudioInputDevice] = []
@@ -24,6 +25,7 @@ struct MenuContent: View {
     @State private var micObserver = AudioInputDeviceObserver()
     @State private var micRefreshTask: Task<Void, Never>?
     @State private var browserControlEnabled = true
+    @State private var testNotificationPending = false
     @AppStorage(cameraEnabledKey, store: AppDefaults.standard) private var cameraEnabled: Bool = false
     @AppStorage(appLogLevelKey, store: AppDefaults.standard)
     private var appLogLevelRaw: String = Logger.Level.info.rawValue
@@ -48,9 +50,6 @@ struct MenuContent: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(self.connectionLabel)
                     self.statusLine(label: self.healthStatus.label, color: self.healthStatus.color)
-                    if let macNodeStatus = self.macNodeStatus {
-                        self.statusLine(label: macNodeStatus.label, color: macNodeStatus.color)
-                    }
                     if self.pairingPrompter.pendingCount > 0 {
                         self.pairingStatusLine(
                             label: "Pairing approval pending (\(self.pairingPrompter.pendingCount))")
@@ -64,6 +63,15 @@ struct MenuContent: View {
                 }
             }
             .disabled(self.state.connectionMode == .unconfigured)
+            // The native-menu extra style flattens multi-view Toggle labels to
+            // their first Text, so status sublines inside the label above never
+            // render. Node-channel state must be a top-level menu view to stay
+            // operator-visible (same pattern as the exec-approval error lines).
+            if let macNodeStatus = self.macNodeStatus {
+                Text(macNodeStatus.label)
+                    .font(.caption)
+                    .foregroundStyle(macNodeStatus.color)
+            }
 
             Divider()
             Toggle(isOn: self.heartbeatsBinding) {
@@ -129,6 +137,11 @@ struct MenuContent: View {
             .opacity(voiceWakeSupported ? 1 : 0.5)
             if self.showVoiceWakeMicPicker {
                 self.voiceWakeMicMenu
+            }
+            Button {
+                self.open(tab: .voiceWake)
+            } label: {
+                Label("Voice & Talk Settings…", systemImage: "slider.horizontal.3")
             }
             Divider()
             Button {
@@ -325,10 +338,11 @@ struct MenuContent: View {
                     Label("Send Debug Voice Text", systemImage: "waveform.circle")
                 }
                 Button {
-                    Task { await DebugActions.sendTestNotification() }
+                    Task { await self.sendTestNotification() }
                 } label: {
                     Label("Send Test Notification", systemImage: "bell")
                 }
+                .disabled(self.testNotificationPending)
                 Divider()
                 if self.state.connectionMode == .local {
                     Button {
@@ -358,6 +372,12 @@ struct MenuContent: View {
     private var macNodeStatus: (label: String, color: Color)? {
         guard self.state.connectionMode != .unconfigured else { return nil }
         guard case .connected = self.controlChannel.state else { return nil }
+
+        // The coordinator records why the node channel is down at the connect
+        // boundary; prefer that recorded fact over inferring from node listings.
+        if let line = self.nodeChannelStatus.state.operatorStatusLine {
+            return (line.label, line.isDegraded ? .orange : .red)
+        }
 
         let deviceId: String
         switch self.nodesStore.localNodeIdentityState {
@@ -589,6 +609,27 @@ struct MenuContent: View {
             alert.alertStyle = .informational
         case let .failure(error):
             alert.informativeText = error.localizedDescription
+            alert.alertStyle = .warning
+        }
+        alert.runModal()
+    }
+
+    @MainActor
+    private func sendTestNotification() async {
+        guard !self.testNotificationPending else { return }
+        self.testNotificationPending = true
+        let outcome = await DebugActions.sendTestNotification()
+        self.testNotificationPending = false
+        let alert = NSAlert()
+        alert.messageText = "Test Notification"
+        switch outcome {
+        case .pending:
+            return
+        case .sent:
+            alert.informativeText = "The notification request was queued."
+            alert.alertStyle = .informational
+        case let .error(message):
+            alert.informativeText = message
             alert.alertStyle = .warning
         }
         alert.runModal()
