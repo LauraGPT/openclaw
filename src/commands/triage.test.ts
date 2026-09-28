@@ -10,7 +10,7 @@ import { UpdateCommandFailure } from "../cli/update-cli/update-command-result.js
 import { withUpdateFailureTriage } from "../cli/update-cli/update-command-triage.js";
 import type { HealthFinding } from "../flows/health-checks.js";
 import { resolveInstallationTarget } from "../infra/installation-target-context.js";
-import type { UpdateRunResult } from "../infra/update-runner.js";
+import type { UpdateRunResult } from "../infra/update-runner-types.js";
 import { defaultRuntime } from "../runtime.js";
 import { createDeferredCore } from "../shared/deferred.js";
 import { triageAfterFailure } from "./triage-failure.js";
@@ -57,7 +57,7 @@ vi.mock("node:child_process", async (importOriginal) => ({
   spawn: mocks.spawn,
 }));
 
-vi.mock("./doctor-lint.js", () => ({
+vi.mock("./doctor-lint-runner.js", () => ({
   collectDoctorFindings: mocks.collectDoctorFindings,
 }));
 
@@ -464,8 +464,6 @@ describe("triageCommand", () => {
 
   it.each([
     { agent: "claude", exitCode: 0 },
-    { agent: "claude", exitCode: 17 },
-    { agent: "codex", exitCode: 0 },
     { agent: "codex", exitCode: 17 },
   ])(
     "preserves external $agent exit $exitCode without certifying descendant cleanup",

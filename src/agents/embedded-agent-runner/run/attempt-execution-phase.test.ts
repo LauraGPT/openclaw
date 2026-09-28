@@ -337,7 +337,11 @@ describe("runEmbeddedAttemptExecutionPhase", () => {
           {
             type: "openai_responses_terminal",
             timestamp: 1,
-            details: { eventType: "response.incomplete", incompleteReason: "max_output_tokens" },
+            details: {
+              eventType: "response.incomplete",
+              stopReason: "length",
+              incompleteReason: "max_output_tokens",
+            },
           },
         ];
       }
@@ -672,8 +676,8 @@ describe("runEmbeddedAttemptExecutionPhase", () => {
     const abortInput = mocks.createRunAbort.mock.calls[0]?.[0];
     expect(abortInput.abortActiveSession).toBe(fixture.abortActiveSession);
     const streamInput = mocks.prepareStream.mock.calls[0]?.[0];
-    expect(streamInput.activeSession).toBe(fixture.activeSession);
-    expect(streamInput.trustedLocalMediaToolNames).toEqual(new Set(["read"]));
+    expect(streamInput.agentSession.activeSession).toBe(fixture.activeSession);
+    expect(streamInput.agentSession.trustedLocalMediaToolNames).toEqual(new Set(["read"]));
     expect(streamInput.onModelUsage).toBe(
       mocks.installStreamGuards.mock.results[0]?.value.onModelUsage,
     );

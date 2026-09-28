@@ -98,7 +98,7 @@ function pageArrays(pages) {
   return pages.flat();
 }
 
-function readPolicy(repo) {
+export function readMergePolicy(repo) {
   let response;
   try {
     response = execPrGh(
@@ -151,9 +151,14 @@ function readPolicy(repo) {
 }
 
 function readPullRequest(repo, authority, pr) {
-  const record = read(repo, `/pulls/${pr}`);
+  // Mergeability depends on the writer; pooled readers can see a different policy projection.
+  const response = parseGithubResponse(
+    execPrGh(apiArgs(repo, `/pulls/${pr}`, ["--include"]), { encoding: "utf8" }, "plain"),
+  );
+  const record = response.body;
   requireEvidence(
-    record?.number === pr &&
+    response.status === "200" &&
+      record?.number === pr &&
       nonemptyString(record.node_id) &&
       nonemptyString(record.title) &&
       record.html_url === `${repo.url}/pull/${pr}` &&
@@ -163,6 +168,7 @@ function readPullRequest(repo, authority, pr) {
       record.base.ref === "main" &&
       OID.test(record.base.sha ?? "") &&
       OID.test(record.head?.sha ?? "") &&
+      nonemptyString(record.head?.ref) &&
       ["open", "closed"].includes(record.state) &&
       typeof record.merged === "boolean" &&
       typeof record.draft === "boolean" &&
@@ -231,7 +237,7 @@ function beginRead(repo, pr, observe) {
     receipt || authority.permissions?.admin === true,
     "policy-reader admin access changed",
   );
-  const policy = receipt ? null : readPolicy(repo);
+  const policy = receipt ? null : readMergePolicy(repo);
   return { authority, main: mainSha, record, policy };
 }
 
@@ -377,9 +383,9 @@ function latestRequiredChecks(repo, head, checks) {
   return [...unique, ...groups.values()];
 }
 
-function requiredChecks(repo, snapshot) {
+export function readRequiredMergeChecks(repo, head, policy, { includeCheckIdentity = false } = {}) {
   const requirements = new Map();
-  for (const rule of snapshot.policy.rules) {
+  for (const rule of policy.rules) {
     if (rule.type !== "required_status_checks") {
       continue;
     }
@@ -396,7 +402,6 @@ function requiredChecks(repo, snapshot) {
     required.some(
       ({ context, app }) => check.name === context && (app === null || check.app.id === app),
     );
-  const head = snapshot.record.head.sha;
   const contexts = new Set(required.map(({ context }) => context));
   const nameFilter =
     contexts.size === 1 ? `&check_name=${encodeURIComponent(required[0].context)}` : "";
@@ -506,19 +511,30 @@ function requiredChecks(repo, snapshot) {
     const matchingStatuses = statuses.filter((status) => status.context === context);
     const boundChecks = candidates
       .filter((check) => check.name === context && (app === null || check.app.id === app))
-      .map((check) =>
-        (check.status === "completed"
-          ? (check.conclusion ?? "UNKNOWN")
-          : check.status
-        ).toUpperCase(),
-      );
+      .map((check) => {
+        const state = (
+          check.status === "completed" ? (check.conclusion ?? "UNKNOWN") : check.status
+        ).toUpperCase();
+        return includeCheckIdentity
+          ? {
+              state,
+              checkRunId: check.id,
+              checkSuiteId: check.check_suite?.id,
+              publisherId: check.app.id,
+            }
+          : { state };
+      });
     const matches = [
       ...boundChecks,
-      ...(app !== null && boundChecks.length === 0 ? ["EXPECTED"] : []),
-      ...matchingStatuses.map((status) => status.state.toUpperCase()),
+      ...(app !== null && boundChecks.length === 0 ? [{ state: "EXPECTED" }] : []),
+      ...matchingStatuses.map((status) =>
+        includeCheckIdentity
+          ? { state: status.state.toUpperCase(), statusId: status.id }
+          : { state: status.state.toUpperCase() },
+      ),
     ];
-    for (const state of matches.length > 0 ? matches : ["EXPECTED"]) {
-      rows.push({ name: context, bucket: bucket(state), state });
+    for (const match of matches.length > 0 ? matches : [{ state: "EXPECTED" }]) {
+      rows.push({ name: context, bucket: bucket(match.state), ...match });
     }
   }
   return canonical(rows);
@@ -558,15 +574,9 @@ function main([mode, repository, prValue, head, bodySnapshot, expectedObservatio
   const observing = mode === "observe" || mode === "observe-admission";
   const body = mode === "merge" ? mergeBody(bodySnapshot) : undefined;
   const snapshot = beginRead(repo, pr, observing);
-  if (observing && snapshot.record.state === "open") {
-    requireRestSupport(
-      ["clean", "unknown"].includes(snapshot.record.mergeable_state),
-      "merge projection requires GraphQL admission",
-    );
-  }
   const checks =
     mode === "checks" || ((observing || mode === "merge") && snapshot.record.state === "open")
-      ? requiredChecks(repo, snapshot)
+      ? readRequiredMergeChecks(repo, snapshot.record.head.sha, snapshot.policy)
       : undefined;
   if (mode !== "checks" && checks !== undefined) {
     requireEvidence(
@@ -576,6 +586,14 @@ function main([mode, repository, prValue, head, bodySnapshot, expectedObservatio
     snapshot.policy.requiredChecks = checks;
   }
   const current = finishRead(repo, pr, snapshot, mode === "observe");
+  if (observing && current.state === "open") {
+    // REST can still be calculating after GraphQL is ready. Select the alternate
+    // reader before retaining intent; mutation dispatch never changes transports.
+    requireRestSupport(
+      current.mergeable === true && current.mergeable_state === "clean",
+      "merge projection requires GraphQL admission",
+    );
+  }
   let result;
   if (mode === "checks") {
     result = checks;
