@@ -11,6 +11,9 @@ afterEach(async () => {
   session = undefined;
   const activeServer = server;
   if (activeServer) {
+    for (const client of activeServer.clients) {
+      client.terminate();
+    }
     await new Promise<void>((resolve) => {
       activeServer.close(() => resolve());
     });
